@@ -5,8 +5,8 @@ import './components/style.css';
 
 const roomParts = [
   { id: 'wall1', name: 'Main Wall', mask: require('./assets/wall_1_mask.png') },
-  { id: 'wall2', name: 'Right Wall', mask: require('./assets/wall_2_mask.png') },
   { id: 'wall3', name: 'Left Wall', mask: require('./assets/wall_3_mask.png') },
+  { id: 'wall2', name: 'Right Wall', mask: require('./assets/wall_2_mask.png') },
 ];
 
 function App() {
