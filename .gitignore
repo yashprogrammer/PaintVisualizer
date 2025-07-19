@@ -1,5 +1,10 @@
 # dependencies
 /node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
 
 # production
 /build
@@ -21,4 +26,7 @@ yarn-error.log*
 
 # IDE files
 .idea/
-.vscode/ 
+.vscode/
+
+# Client Assets
+AssetsByClient/

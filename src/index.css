@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  @keyframes fade-in-out {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    20%,
+    80% {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in-out {
+    animation: fade-in-out 25s infinite;
+  }
+
+  @keyframes carousel-drift {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-carousel-drift {
+    animation: carousel-drift 60s linear infinite;
+  }
+}
