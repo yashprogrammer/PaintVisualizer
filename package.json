@@ -15,6 +15,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.7.0",
     "react-scripts": "^5.0.1",
+    "react-spring": "^10.0.1",
     "tailwindcss": "^3.3.3"
   },
   "browserslist": {
