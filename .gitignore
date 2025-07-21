@@ -30,3 +30,4 @@ yarn-error.log*
 
 # Client Assets
 AssetsByClient/
+.DS_Store
