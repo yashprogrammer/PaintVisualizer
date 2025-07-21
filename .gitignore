@@ -31,3 +31,7 @@ yarn-error.log*
 # Client Assets
 AssetsByClient/
 .DS_Store
+
+.cursorrules
+.DS_Store
+TestCases_Phase5_HotspotSelection.md
