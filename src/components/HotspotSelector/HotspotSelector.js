@@ -100,10 +100,7 @@ const HotspotSelector = () => {
         )}
       </div>
 
-      {/* Dulux Logo */}
-      <div className="absolute top-8 right-8 z-20">
-        <img src='/Dulux.png' alt="Dulux" className="w-28"/>
-      </div>
+      
 
       {/* Hotspots */}
       {imageLoaded && cityData.hotspots.map((hotspot) => (
