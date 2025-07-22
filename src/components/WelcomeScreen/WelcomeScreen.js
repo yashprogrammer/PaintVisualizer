@@ -23,7 +23,7 @@ const WelcomeScreen = () => {
   const [popupHearts, setPopupHearts] = useState([]);
   const duration = 3000; // 3 seconds
   const loop = false;
-  const MIN_DISTANCE = 48; // 3rem = 48px (assuming 1rem = 16px)
+  const MIN_DISTANCE = 200; // 3rem = 48px (assuming 1rem = 16px)
 
   const handleNavigate = () => {
     navigate('/city-selection');
@@ -106,11 +106,11 @@ const WelcomeScreen = () => {
     // Create hearts at regular intervals
     const interval = setInterval(() => {
       setPopupHearts(prev => {
-        if (prev.length >= 15) return prev; // Limit to 15 hearts max
+        if (prev.length >= 30) return prev; // Limit to 15 hearts max
         const newHeart = createHeart(prev);
         return [...prev, newHeart];
       });
-    }, 1200); // New heart every 1.2 seconds
+    }, 400); // New heart every 1.2 seconds
 
     return () => {
       clearInterval(interval);
@@ -141,12 +141,12 @@ const WelcomeScreen = () => {
                 : h
             )
           );
-        }, 4000);
+        }, 6000);
 
         // Remove heart after fade out completes
         setTimeout(() => {
           setPopupHearts(prev => prev.filter(h => h.id !== heart.id));
-        }, 5000);
+        }, 7000);
       }
     });
   }, [popupHearts]);
