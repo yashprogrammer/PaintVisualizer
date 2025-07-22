@@ -99,26 +99,27 @@ The Paint Visualizer app allows users to explore color palettes inspired by diff
 
 ## Data Structure
 
+The primary data will be structured around cities, with nested information for hotspots, palettes, and associated assets. Using predefined coordinates for hotspots is crucial for performance and reliability.
+
 ```javascript
-// Example data structure
-const cities = [
-  {
-    id: "france",
+// Example data structure in /src/data/cities.js
+export const citiesData = {
+  france: {
     name: "France",
-    images: ["france_1.jpg", "france_2.jpg"],
-    videos: ["france_video_1.mp4", "france_video_2.mp4"],
+    hotspotImage: "/City/Hotspot/france.png",
+    videos: ["/City/Video/France.mp4"],
     hotspots: [
-      { x: 120, y: 350, colorId: "french_blue" },
-      { x: 250, y: 180, colorId: "paris_pink" },
-      // More hotspots
+      { id: "provence-lavender", name: "Provence Lavender", color: "#8b80b6", x: "25%", y: "40%" },
+      { id: "sunflower-yellow", name: "Sunflower Yellow", color: "#f9d71c", x: "60%", y: "65%" },
+      { id: "riviera-blue", name: "Riviera Blue", color: "#0077be", x: "75%", y: "30%" }
     ],
     colorPalettes: {
       vibrant: ["#e8c1c5", "#b6d8f2", "#f4afab", "#c9b7ad"],
       calm: ["#d1e0eb", "#e8d1c5", "#c9d8c5", "#e0ebde"]
     }
   },
-  // More cities
-];
+  // ... more cities
+};
 
 const rooms = [
   {
@@ -137,59 +138,51 @@ const rooms = [
 
 **Phase 1: Setup and Basic Structure**
 
-*   [x] Initialize React project
-*   [x] Set up routing
-*   [x] Create basic component structure
-*   [x] Implement responsive layout
+*   [x] Initialize React project with Vite for a fast development experience.
+*   [x] Set up routing using `react-router-dom`.
+*   [x] Create basic component folder structure.
+*   [x] Implement a responsive layout foundation with Tailwind CSS.
 
 **Phase 2: Welcome and Loading Screens**
 
-*   [x] Implement welcome screen with animations and background carousel
-*   [x] Update welcome screen to match the "Colours of the World" design with split-screen layout
-*   [x] Implement heart logo in the welcome screen
-*   [x] Replace text logo with colorOfTheWorld.jpg image
-*   [x] Implement infinitely drifting carousel animation with stacked city images
-*   [ ] Create loading animation with heart fill effect
-*   [ ] Add transition to city selection
-
-**Phase 1: Setup and Basic Structure**
-
-  * Initialize React project
-  * Set up routing
-  * Create basic component structure
-  * Implement responsive layout
-
-**Phase 2: Welcome and Loading Screens**
-
-  * Implement welcome screen with animations
-  * Create loading animation with heart fill effect
-  * Add transition to city selection
+*   [x] Implement welcome screen with animations and background carousel.
+*   [x] Update welcome screen to match the "Colours of the World" design.
+*   [x] Implement heart logo and brand imagery.
+*   [x] Implement infinitely drifting carousel animation.
+*   [ ] Create loading animation with heart fill effect.
+*   [ ] Add transition from Loading screen to City Selection.
 
 **Phase 3: City Selection**
 
-  * Build horizontal carousel for city selection
-  * Implement selection logic and visual feedback
-  * Create blurred background effect that changes with selection
+*   [x] Build horizontal carousel for city selection.
+*   [x] Implement selection logic and visual feedback (center highlight).
+*   [x] Create blurred background effect that changes with selection.
+*   [x] On selection, navigate to the city's video player screen.
 
 **Phase 4: Video Playback**
 
-  * Implement video player component
-  * Set up sequential playback functionality
-  * Add transition to hotspot selection screen
+*   [ ] Implement video player component to play city-specific videos.
+*   [ ] Set up sequential playback if multiple videos exist.
+*   [ ] On video completion, navigate to the Hotspot Selection screen.
 
 **Phase 5: Hotspot Selection**
 
-  * Create interactive image with clickable hotspots
-  * Implement hotspot highlighting and selection
-  * Add transition to visualizer screen
+*   [x] **Define Data:** Finalize the `citiesData` structure with `hotspotImage` and an array of `hotspots` using percentage-based coordinates for responsiveness.
+*   [x] **Create Route:** Add a new route in `App.js` for `'/hotspot/:cityName'`.
+*   [x] **Build Component:** Create `HotspotSelector.js`.
+    *   It will use `useParams` to identify the current city.
+    *   It will render the city's static `hotspotImage` as the background.
+    *   It will map over the `hotspots` array, rendering an absolutely positioned, animated button for each one based on its `x` and `y` coordinates.
+*   [x] **Implement Navigation:** On clicking a hotspot, navigate to the visualizer screen, passing the city and selected color information (e.g., `/visualizer/france?color=provence-lavender`).
+*   [x] **Add Instructions:** Display the text "TAP A PAINT TONE HOTSPOT TO CONTINUE".
 
 **Phase 6: Paint Visualizer**
 
-  * Implement three-column layout
-  * Create room visualization with selectable surfaces
-  * Build color application functionality using image masks
-  * Add room type selection
-  * Implement color palette selection
+*   [ ] Implement three-column layout.
+*   [ ] Create room visualization with selectable surfaces
+*   [ ] Build color application functionality using image masks
+*   [ ] Add room type selection
+*   [ ] Implement color palette selection
 
 **Phase 7: Refinement and Additional Features**
 
@@ -224,11 +217,10 @@ const rooms = [
 
 ## Testing Strategy
 
-  * Component testing with Jest and React Testing Library
-  * User flow testing to ensure smooth navigation
-  * Performance testing, especially for image processing
-  * Cross-browser compatibility testing
-  * Mobile device testing
+  * **Component Testing**: Use Jest and React Testing Library for unit and integration testing of individual components.
+  * **End-to-End (E2E) Testing**: Use **Playwright** to create functional tests that simulate the full user journey.
+      * *Example Flow*: A test could start at the City Selector, choose a city, watch the video, land on the Hotspot Selector, click a specific hotspot, and verify it navigates to the Visualizer screen with the correct parameters in the URL.
+  * **Performance Testing**: Manually assess performance, especially for animations and the room visualizer's color application.
 
 -----
 

@@ -20,7 +20,8 @@ const CitySelector = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const itemWidth = 144; // 128px width + 16px margin
+  const itemWidth = 288; // 256px width + 32px margin (doubled from 144)
+  const itemHeight = 160; // 160px height (doubled from 80px)
   const carouselRef = useRef(null);
   
   // Create a smaller multiplier so repeats are visible
@@ -103,7 +104,7 @@ const CitySelector = () => {
       <div className="absolute inset-0 bg-black opacity-30"></div>
 
       <div className="absolute top-8 right-8 z-20">
-        <img src='/colorOfTheWorld.jpg' alt="Colours of the World" className="w-28"/>
+        <img src='/Dulux.png' alt="Colours of the World" className="w-28"/>
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-white">
@@ -122,8 +123,8 @@ const CitySelector = () => {
               <div 
                 className="absolute z-20 pointer-events-none"
                 style={{
-                  width: '136px',
-                  height: '84px',
+                  width: '272px', // doubled from 136px
+                  height: '168px', // doubled from 84px
                   border: '3px solid white',
                   borderRadius: '12px',
                   boxShadow: '0 0 15px rgba(255,255,255,0.6)',
@@ -168,16 +169,16 @@ const CitySelector = () => {
                   return (
                     <div
                       key={`${city.name}-${index}`}
-                      className="flex-shrink-0 mx-2"
+                      className="flex-shrink-0 mx-4"
                       style={{ 
-                        width: '128px',
-                        height: '80px'
+                        width: '256px', // doubled from 128px
+                        height: '160px' // doubled from 80px
                       }}
                     >
                       <img 
                         src={city.image} 
                         alt={city.name}
-                        className={`w-32 h-20 object-cover rounded-lg transition-all duration-300 select-none ${
+                        className={`w-64 h-40 object-cover rounded-lg transition-all duration-300 select-none ${
                           isSelected
                             ? 'opacity-100 shadow-lg scale-105' 
                             : 'opacity-60 scale-95'
@@ -254,9 +255,14 @@ const CitySelector = () => {
           <p className="text-xl font-light tracking-[0.3em]">EXPLORE</p>
         </div>
 
-        <p className="absolute bottom-12 text-white text-sm tracking-widest z-10" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.5)' }}>
-          CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
-        </p>
+        {/* Instruction text with glass panel background */}
+        <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="bg-white bg-opacity-20 backdrop-blur-md rounded-lg px-8 py-4 border border-white border-opacity-30 shadow-lg">
+            <p className="text-white text-sm tracking-widest text-center" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.5)' }}>
+              CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
