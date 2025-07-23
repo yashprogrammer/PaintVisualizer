@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const RoomVisualizer = () => {
   // State management
   const [currentPalette, setCurrentPalette] = useState(1);
-  const [currentRoom, setCurrentRoom] = useState('living-room');
+  const [currentRoom, setCurrentRoom] = useState('bedroom');
   const [currentPaintColor, setCurrentPaintColor] = useState('#d07171');
-  const [selectedSurface, setSelectedSurface] = useState('main');
+  const [selectedSurface, setSelectedSurface] = useState('wall1');
+  const [surfaceColors, setSurfaceColors] = useState({
+    wall1: '#d07171',
+    wall2: '#d07171', 
+    wall3: '#d07171'
+  });
   const [colorPalettes, setColorPalettes] = useState({
     1: {
       name: 'Vibrant Cool',
@@ -18,6 +23,11 @@ const RoomVisualizer = () => {
       paintColors: []
     }
   });
+
+  // Refs for canvas operations
+  const containerRef = useRef(null);
+  const maskImagesRef = useRef({});
+  const [isMasksLoaded, setIsMasksLoaded] = useState(false);
 
   // Function to extract colors from SVG content
   const extractColorsFromSVG = (svgContent) => {
@@ -114,27 +124,131 @@ const RoomVisualizer = () => {
     loadPaletteColors();
   }, []);
 
+  // Load mask images for the current room
+  useEffect(() => {
+    const loadMaskImages = async () => {
+      const currentRoomData = roomData[currentRoom];
+      if (!currentRoomData?.surfaces) return;
+
+      console.log(`Loading masks for room: ${currentRoom}`);
+      
+      const loadPromises = currentRoomData.surfaces.map(surface => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = surface.mask;
+          
+          console.log(`Loading mask for ${surface.id}: ${surface.mask}`);
+          
+          img.onload = () => {
+            console.log(`✅ Successfully loaded mask for ${surface.id}`);
+            maskImagesRef.current[surface.id] = img;
+            resolve();
+          };
+          img.onerror = (error) => {
+            console.error(`❌ Failed to load mask for ${surface.id}:`, surface.mask, error);
+            resolve(); // Continue even if one mask fails
+          };
+        });
+      });
+
+      try {
+        await Promise.all(loadPromises);
+        console.log(`✅ All masks loaded for ${currentRoom}. Loaded masks:`, Object.keys(maskImagesRef.current));
+        setIsMasksLoaded(true);
+      } catch (error) {
+        console.error('Error loading mask images:', error);
+        setIsMasksLoaded(false);
+      }
+    };
+
+    setIsMasksLoaded(false);
+    maskImagesRef.current = {}; // Clear previous masks
+    loadMaskImages();
+  }, [currentRoom]);
+
+  // Handle canvas click for surface selection
+  const handleCanvasClick = (e) => {
+    if (!isMasksLoaded) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const currentRoomData = roomData[currentRoom];
+    if (!currentRoomData?.surfaces) return;
+
+    // Check surfaces in reverse order (top-most first)
+    const reversedSurfaces = [...currentRoomData.surfaces].reverse();
+
+    for (const surface of reversedSurfaces) {
+      const img = maskImagesRef.current[surface.id];
+      if (!img) continue;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      try {
+        const pixelData = ctx.getImageData(x, y, 1, 1).data;
+        if (pixelData[3] > 0) { // Check alpha channel
+          setSelectedSurface(surface.id);
+          return;
+        }
+      } catch (error) {
+        console.warn('Error reading pixel data:', error);
+      }
+    }
+  };
+
   // Room data with different surface colors
   const roomData = {
-    'living-room': {
-      name: 'Living Room',
-      baseColor: '#883f3f',
-      surfaces: ['main', 'accent1', 'accent2']
-    },
     'bedroom': {
       name: 'Bedroom',
       baseColor: '#6b4f8a',
-      surfaces: ['main', 'accent1', 'accent2']
+      baseImage: '/Room/Bedroom/base.png',
+      surfaces: [
+        { id: 'wall1', name: 'Wall 1', mask: '/Room/Bedroom/wall1.png' },
+        { id: 'wall2', name: 'Wall 2', mask: '/Room/Bedroom/wall2.png' },
+        { id: 'wall3', name: 'Wall 3', mask: '/Room/Bedroom/wall3.png' }
+      ]
+    },
+    'living-room': {
+      name: 'Living Room',
+      baseColor: '#883f3f',
+      baseImage: '/Room/Bedroom/base.png', // Fallback to bedroom
+      surfaces: [
+        { id: 'wall1', name: 'Wall 1', mask: '/Room/Bedroom/wall1.png' },
+        { id: 'wall2', name: 'Wall 2', mask: '/Room/Bedroom/wall2.png' },
+        { id: 'wall3', name: 'Wall 3', mask: '/Room/Bedroom/wall3.png' }
+      ]
     },
     'kitchen': {
       name: 'Kitchen',
       baseColor: '#5a7c65',
-      surfaces: ['main', 'accent1', 'accent2']
+      baseImage: '/Room/Bedroom/base.png', // Fallback to bedroom
+      surfaces: [
+        { id: 'wall1', name: 'Wall 1', mask: '/Room/Bedroom/wall1.png' },
+        { id: 'wall2', name: 'Wall 2', mask: '/Room/Bedroom/wall2.png' },
+        { id: 'wall3', name: 'Wall 3', mask: '/Room/Bedroom/wall3.png' }
+      ]
     },
     'bathroom': {
       name: 'Bathroom',
       baseColor: '#7a6b5a',
-      surfaces: ['main', 'accent1', 'accent2']
+      baseImage: '/Room/Bedroom/base.png', // Fallback to bedroom
+      surfaces: [
+        { id: 'wall1', name: 'Wall 1', mask: '/Room/Bedroom/wall1.png' },
+        { id: 'wall2', name: 'Wall 2', mask: '/Room/Bedroom/wall2.png' },
+        { id: 'wall3', name: 'Wall 3', mask: '/Room/Bedroom/wall3.png' }
+      ]
     }
   };
 
@@ -153,7 +267,16 @@ const RoomVisualizer = () => {
         const colorIndex = parseInt(event.key) - 1;
         const paletteColors = colorPalettes[currentPalette]?.paintColors;
         if (paletteColors && paletteColors[colorIndex]) {
-          setCurrentPaintColor(paletteColors[colorIndex]);
+          selectPaint(paletteColors[colorIndex]);
+        }
+      }
+      
+      // Number keys 5-7 for surface selection (wall1, wall2, wall3)
+      if (event.key >= '5' && event.key <= '7') {
+        const surfaceIndex = parseInt(event.key) - 5;
+        const currentRoomData = roomData[currentRoom];
+        if (currentRoomData?.surfaces && currentRoomData.surfaces[surfaceIndex]) {
+          setSelectedSurface(currentRoomData.surfaces[surfaceIndex].id);
         }
       }
       
@@ -167,13 +290,13 @@ const RoomVisualizer = () => {
         const rooms = Object.keys(roomData);
         const currentIndex = rooms.indexOf(currentRoom);
         const nextIndex = (currentIndex + 1) % rooms.length;
-        setCurrentRoom(rooms[nextIndex]);
+        selectRoom(rooms[nextIndex]);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentPalette, currentRoom, colorPalettes]);
+  }, [currentPalette, currentRoom, colorPalettes, selectedSurface]);
 
   // Event handlers
   const selectPalette = (paletteId) => {
@@ -182,6 +305,11 @@ const RoomVisualizer = () => {
 
   const selectPaint = (color) => {
     setCurrentPaintColor(color);
+    // Update the color for the currently selected surface
+    setSurfaceColors(prev => ({
+      ...prev,
+      [selectedSurface]: color
+    }));
   };
 
   const selectSurface = (surfaceId) => {
@@ -190,11 +318,17 @@ const RoomVisualizer = () => {
 
   const selectRoom = (roomType) => {
     setCurrentRoom(roomType);
+    // Reset surface colors when changing rooms
+    setSurfaceColors({
+      wall1: currentPaintColor,
+      wall2: currentPaintColor,
+      wall3: currentPaintColor
+    });
   };
 
   // Get current room surface color
   const getCurrentSurfaceColor = () => {
-    return currentPaintColor || roomData[currentRoom].baseColor;
+    return surfaceColors[selectedSurface] || currentPaintColor || roomData[currentRoom].baseColor;
   };
 
   return (
@@ -224,7 +358,28 @@ const RoomVisualizer = () => {
           transition: transform 0.2s ease;
         }
         
-                 /* Responsive adjustments */
+        /* Mask overlay improvements */
+        .mask-overlay {
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: crisp-edges;
+        }
+        
+        .room-container {
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .room-container img {
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: crisp-edges;
+        }
+        
+        /* Surface selection feedback */
+        .surface-selected {
+          filter: brightness(1.1) saturate(1.2);
+        }
+        
+        /* Responsive adjustments */
          @media (max-width: 1024px) {
            .main-container {
              flex-direction: column;
@@ -321,13 +476,72 @@ const RoomVisualizer = () => {
             {/* Room Visualization Area */}
             <div className="flex-1 flex flex-col gap-2.5 items-center justify-center overflow-hidden pb-0 pt-4 lg:pt-8 px-4 lg:px-[18px] w-full min-h-0">
               <div 
-                className="flex-1 w-full rounded-2xl lg:rounded-3xl room-surface cursor-pointer transition-colors duration-300 min-h-[200px]"
-                style={{ backgroundColor: getCurrentSurfaceColor() }}
-                onClick={() => selectSurface('main')}
+                ref={containerRef}
+                className="flex-1 w-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
+                onClick={handleCanvasClick}
               >
+                {/* Base room image */}
+                <img 
+                  src={roomData[currentRoom].baseImage} 
+                  alt={`${roomData[currentRoom].name} base`}
+                  className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+                />
+                
+                {/* Mask overlays for each surface */}
+                {roomData[currentRoom].surfaces.map((surface, idx) => {
+                  const maskLoaded = maskImagesRef.current[surface.id];
+                  const surfaceColor = surfaceColors[surface.id] || currentPaintColor;
+                  
+                  return (
+                    <div
+                      key={surface.id}
+                      className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl transition-opacity duration-200 ${selectedSurface === surface.id ? 'opacity-100' : 'opacity-80'}`}
+                      style={{
+                        backgroundColor: surfaceColor,
+                        maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                        WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                        maskSize: 'cover',
+                        WebkitMaskSize: 'cover',
+                        maskRepeat: 'no-repeat',
+                        WebkitMaskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        WebkitMaskPosition: 'center',
+                        mixBlendMode: 'multiply',
+                        zIndex: idx + 1,
+                        pointerEvents: 'none',
+                        // Hide overlay if mask hasn't loaded to prevent full-image coloring
+                        display: maskLoaded ? 'block' : 'none',
+                      }}
+                    />
+                  );
+                })}
+                
+                {/* Loading indicator */}
+                {!isMasksLoaded && (
+                  <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center rounded-2xl lg:rounded-3xl">
+                    <div className="bg-white px-4 py-2 rounded-lg text-sm font-medium">
+                      Loading masks...
+                    </div>
+                  </div>
+                )}
+                
+                {/* Selection indicator */}
+                {selectedSurface && (
+                  <div className="absolute top-6 left-6 bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium">
+                    {roomData[currentRoom].surfaces.find(s => s.id === selectedSurface)?.name || selectedSurface}
+                  </div>
+                )}
+                
+                {/* Debug info (remove in production) */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+                    Masks loaded: {isMasksLoaded ? 'Yes' : 'No'} | 
+                    Count: {Object.keys(maskImagesRef.current).length}
+                  </div>
+                )}
               </div>
               <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center">
-                <p className="block leading-normal">Select Surface to paint</p>
+                <p className="block leading-normal">Click on surfaces to select and paint</p>
               </div>
             </div>
             
@@ -362,25 +576,35 @@ const RoomVisualizer = () => {
           <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-right w-full">
             <p className="block leading-normal">Select Room</p>
           </div>
-          <div className="container-height flex flex-col gap-2.5 flex-1 items-start justify-start p-3 lg:p-[16px] rounded-2xl lg:rounded-3xl border-[3px] lg:border-[5px] border-solid border-[#d2d2d2] w-full">
+          <div className="container-height flex flex-col flex-1 items-start justify-start p-3 lg:p-[16px] rounded-2xl lg:rounded-3xl border-[3px] lg:border-[5px] border-solid border-[#d2d2d2] w-full h-full min-h-0">
             
             {/* Room Options */}
-            {Object.entries(roomData).map(([roomKey, room], index) => (
-              <div 
-                key={roomKey}
-                className={`flex flex-col gap-2.5 items-center justify-start w-full room-option cursor-pointer ${currentRoom === roomKey ? 'ring-2 lg:ring-4 ring-blue-500' : ''}`}
-                onClick={() => selectRoom(roomKey)}
-                style={{ height: '25%' }}
-              >
+            <div className="flex flex-col flex-1 w-full h-full min-h-0 gap-2.5">
+              {Object.entries(roomData).map(([roomKey, room], index) => (
                 <div 
-                  className="h-full rounded-lg w-full hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: room.baseColor }}
-                />
-                {index < 3 && (
-                  <div className="bg-[#cec5c5] h-0.5 rounded-lg w-3/4" />
-                )}
-              </div>
-            ))}
+                  key={roomKey}
+                  className={`flex flex-col gap-2.5 items-center justify-start w-full room-option cursor-pointer flex-1 min-h-0 ${currentRoom === roomKey ? 'ring-2 lg:ring-4 ring-blue-500' : ''}`}
+                  onClick={() => selectRoom(roomKey)}
+                  style={{ minHeight: 0 }}
+                >
+                  <div className="rounded-lg w-full overflow-hidden relative hover:opacity-80 transition-opacity flex-1 min-h-0">
+                    <img 
+                      src={room.baseImage} 
+                      alt={`${room.name} preview`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                      <span className="text-white text-xs font-medium">
+                        {room.name}
+                      </span>
+                    </div>
+                  </div>
+                  {index < Object.keys(roomData).length - 1 && (
+                    <div className="bg-[#cec5c5] h-0.5 rounded-lg w-3/4" />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
