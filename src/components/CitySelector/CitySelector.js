@@ -3,16 +3,16 @@ import { useSpring, animated } from 'react-spring';
 import { useNavigate } from 'react-router-dom';
 
 const cities = [
-  { name: 'Bali', image: '/City/Bali H Small.png' },
-  { name: 'Egypt', image: '/City/Egypt H Small.png' },
-  { name: 'France', image: '/City/France H Small.png' },
-  { name: 'Greece', image: '/City/Greece H Small.png' },
-  { name: 'Japan', image: '/City/Japan H Small.png' },
-  { name: 'Kenya', image: '/City/Kenya H Small.png' },
-  { name: 'L\'Dweep', image: '/City/L\'Dweep H Small.png' },
-  { name: 'Morocco', image: '/City/Morocco H Small.png' },
-  { name: 'Spain', image: '/City/Spain H Small.png' },
-  { name: 'Vietnam', image: '/City/Vietnam H Small.png' },
+  { name: 'Bali', image: '/City/Bali H Small.png', blurredImage: '/City/Blurred/Bali H Small.jpg' },
+  { name: 'Egypt', image: '/City/Egypt H Small.png', blurredImage: '/City/Blurred/Egypt H Small.jpg' },
+  { name: 'France', image: '/City/France H Small.png', blurredImage: '/City/Blurred/France H Small.jpg' },
+  { name: 'Greece', image: '/City/Greece H Small.png', blurredImage: '/City/Blurred/Greece H Small.jpg' },
+  { name: 'Japan', image: '/City/Japan H Small.png', blurredImage: '/City/Blurred/Japan H Small.jpg' },
+  { name: 'Kenya', image: '/City/Kenya H Small.png', blurredImage: '/City/Blurred/Kenya H Small.jpg' },
+  { name: 'L\'Dweep', image: '/City/L\'Dweep H Small.png', blurredImage: '/City/Blurred/L\'Dweep H Small.jpg' },
+  { name: 'Morocco', image: '/City/Morocco H Small.png', blurredImage: '/City/Blurred/Morocco H Small.jpg' },
+  { name: 'Spain', image: '/City/Spain H Small.png', blurredImage: '/City/Blurred/Spain H Small.jpg' },
+  { name: 'Vietnam', image: '/City/Vietnam H Small.png', blurredImage: '/City/Blurred/Vietnam H Small.jpg' },
 ];
 
 const CitySelector = () => {
@@ -91,17 +91,16 @@ const CitySelector = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
       <img 
-        src={selectedCity.image} 
+        src={selectedCity.blurredImage} 
         alt="Background" 
         className="absolute inset-0 w-full h-full object-cover"
         style={{
-          filter: 'blur(12px)',
           transform: 'scale(1.1)',
         }}
       />
       
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black opacity-30"></div>
+      <img src="/Overlay.png" alt="Overlay" className="absolute inset-0 w-full h-full object-cover" />
 
       <div className="absolute top-8 right-8 z-20">
         <img src='/Dulux.png' alt="Colours of the World" className="w-28"/>
