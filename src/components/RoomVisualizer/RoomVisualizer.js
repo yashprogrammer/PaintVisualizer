@@ -10,11 +10,15 @@ const RoomVisualizer = () => {
   const [currentRoom, setCurrentRoom] = useState('bedroom');
   const [currentPaintColor, setCurrentPaintColor] = useState('#d07171');
   const [selectedSurface, setSelectedSurface] = useState('wall1');
-  const [surfaceColors, setSurfaceColors] = useState({
-    wall1: '#d07171',
-    wall2: '#d07171',
-    wall3: '#d07171'
-  });
+  const [surfaceColors, setSurfaceColors] = useState(
+    Object.keys(roomData).reduce((acc, roomKey) => {
+      acc[roomKey] = roomData[roomKey].surfaces.reduce((sAcc, s) => {
+        sAcc[s.id] = '#d07171';
+        return sAcc;
+      }, {});
+      return acc;
+    }, {})
+  );
   const [colorPalettes, setColorPalettes] = useState({
     1: {
       name: 'Vibrant Cool',
@@ -268,18 +272,15 @@ const RoomVisualizer = () => {
     // Update the color for the currently selected surface
     setSurfaceColors(prev => ({
       ...prev,
-      [selectedSurface]: color
+      [currentRoom]: {
+        ...prev[currentRoom],
+        [selectedSurface]: color
+      }
     }));
   };
 
   const selectRoom = (roomType) => {
     setCurrentRoom(roomType);
-    // Reset surface colors when changing rooms
-    setSurfaceColors({
-      wall1: currentPaintColor,
-      wall2: currentPaintColor,
-      wall3: currentPaintColor
-    });
   };
 
   return (
@@ -375,7 +376,7 @@ const RoomVisualizer = () => {
           currentPalette={currentPalette}
           currentPaintColor={currentPaintColor}
           selectedSurface={selectedSurface}
-          surfaceColors={surfaceColors}
+          surfaceColors={surfaceColors[currentRoom]}
           colorPalettes={colorPalettes}
           containerRef={containerRef}
           handleCanvasClick={handleCanvasClick}
