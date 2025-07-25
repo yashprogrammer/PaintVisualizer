@@ -3,16 +3,16 @@ import { useSpring, animated } from 'react-spring';
 import { useNavigate } from 'react-router-dom';
 
 const cities = [
-  { name: 'Bali', image: '/City/Bali H Small.png', blurredImage: '/City/Blurred/Bali H Small.jpg' },
-  { name: 'Egypt', image: '/City/Egypt H Small.png', blurredImage: '/City/Blurred/Egypt H Small.jpg' },
-  { name: 'France', image: '/City/France H Small.png', blurredImage: '/City/Blurred/France H Small.jpg' },
-  { name: 'Greece', image: '/City/Greece H Small.png', blurredImage: '/City/Blurred/Greece H Small.jpg' },
-  { name: 'Japan', image: '/City/Japan H Small.png', blurredImage: '/City/Blurred/Japan H Small.jpg' },
-  { name: 'Kenya', image: '/City/Kenya H Small.png', blurredImage: '/City/Blurred/Kenya H Small.jpg' },
-  { name: 'L\'Dweep', image: '/City/L\'Dweep H Small.png', blurredImage: '/City/Blurred/L\'Dweep H Small.jpg' },
-  { name: 'Morocco', image: '/City/Morocco H Small.png', blurredImage: '/City/Blurred/Morocco H Small.jpg' },
-  { name: 'Spain', image: '/City/Spain H Small.png', blurredImage: '/City/Blurred/Spain H Small.jpg' },
-  { name: 'Vietnam', image: '/City/Vietnam H Small.png', blurredImage: '/City/Blurred/Vietnam H Small.jpg' },
+  { name: 'Bali', image: '/City/Bali H Small.png', blurredImage: '/City/Blurred/Bali H Small.jpg', video: '/City/SelectionTransition/Bali.mp4' },
+  { name: 'Egypt', image: '/City/Egypt H Small.png', blurredImage: '/City/Blurred/Egypt H Small.jpg', video: '/City/SelectionTransition/Egypt.mp4' },
+  { name: 'France', image: '/City/France H Small.png', blurredImage: '/City/Blurred/France H Small.jpg', video: '/City/SelectionTransition/France.mp4' },
+  { name: 'Greece', image: '/City/Greece H Small.png', blurredImage: '/City/Blurred/Greece H Small.jpg', video: '/City/SelectionTransition/Greece.mp4' },
+  { name: 'Japan', image: '/City/Japan H Small.png', blurredImage: '/City/Blurred/Japan H Small.jpg', video: '/City/SelectionTransition/Japan.mp4' },
+  { name: 'Kenya', image: '/City/Kenya H Small.png', blurredImage: '/City/Blurred/Kenya H Small.jpg', video: '/City/SelectionTransition/Kenya.mp4' },
+  { name: 'L\'Dweep', image: '/City/L\'Dweep H Small.png', blurredImage: '/City/Blurred/L\'Dweep H Small.jpg', video: '/City/SelectionTransition/L\'Dweep.mp4' },
+  { name: 'Morocco', image: '/City/Morocco H Small.png', blurredImage: '/City/Blurred/Morocco H Small.jpg', video: '/City/SelectionTransition/Morocco.mp4' },
+  { name: 'Spain', image: '/City/Spain H Small.png', blurredImage: '/City/Blurred/Spain H Small.jpg', video: '/City/SelectionTransition/Spain.mp4' },
+  { name: 'Vietnam', image: '/City/Vietnam H Small.png', blurredImage: '/City/Blurred/Vietnam H Small.jpg', video: '/City/SelectionTransition/Vietnam.mp4' },
 ];
 
 const CitySelector = () => {
@@ -20,9 +20,15 @@ const CitySelector = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const itemWidth = 288; // 256px width + 32px margin (doubled from 144)
-  const itemHeight = 160; // 160px height (doubled from 80px)
+  const [showHeart, setShowHeart] = useState(true);
+  const [showText, setShowText] = useState(true);
+  const [playVideo, setPlayVideo] = useState(true);
+  const [animationKey, setAnimationKey] = useState(0); // Add animation key state
+  const [textAnimationTrigger, setTextAnimationTrigger] = useState(0); // Separate trigger for text animation
+  const itemWidth = typeof window !== 'undefined' ? (window.innerWidth / 4) : 375; // 1/4 of viewport width for 4 images
+  const itemHeight = 180; // Reduced height to make images more rectangular (16:9 aspect ratio)
   const carouselRef = useRef(null);
+  const videoRef = useRef(null);
   
   // Create a smaller multiplier so repeats are visible
   const multiplier = 5; // Reduced so you can see repetitions
@@ -34,9 +40,40 @@ const CitySelector = () => {
     setCurrentPosition(startIndex);
   }, [startIndex]);
 
+  // Update video source when selected city changes
+  useEffect(() => {
+    if (videoRef.current) {
+      const selectedCity = cities[selectedIndex];
+      videoRef.current.src = selectedCity.video;
+      videoRef.current.load();
+      
+      if (playVideo) {
+        // Only play if playVideo is true
+        videoRef.current.play().catch(error => {
+          console.log('Auto-play failed:', error);
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [selectedIndex]);
+
+  // Handle video play/pause when playVideo state changes
+  useEffect(() => {
+    if (videoRef.current) {
+      if (playVideo) {
+        videoRef.current.play().catch(error => {
+          console.log('Auto-play failed:', error);
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [playVideo]);
+
   const handlePrev = () => {
     if (isTransitioning) return;
-    setIsTransitioning(true);
+    startAnimationSequence();
     
     setCurrentPosition(prev => {
       const newPos = prev - 1;
@@ -45,15 +82,11 @@ const CitySelector = () => {
     });
     
     setSelectedIndex((prev) => (prev === 0 ? cities.length - 1 : prev - 1));
-    
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 500);
   };
 
   const handleNext = () => {
     if (isTransitioning) return;
-    setIsTransitioning(true);
+    startAnimationSequence();
     
     setCurrentPosition(prev => {
       const newPos = prev + 1;
@@ -62,10 +95,39 @@ const CitySelector = () => {
     });
     
     setSelectedIndex((prev) => (prev === cities.length - 1 ? 0 : prev + 1));
+  };
+
+  const startAnimationSequence = () => {
+    setIsTransitioning(true);
+    setShowHeart(false);
+    setShowText(false);
+    setPlayVideo(false);
+    setAnimationKey(prev => prev + 1); // Increment animation key to trigger new animations
+
+    // Immediately update video source for the new selection but don't play
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+
+    // Step 1: Carousel animation (already handled by transition state)
     
+    // Step 2: After 0.5s, fade in heart
     setTimeout(() => {
-      setIsTransitioning(false);
+      setShowHeart(true);
     }, 500);
+
+    // Step 3: After heart fades in (0.8s total), show text and panel
+    setTimeout(() => {
+      setShowText(true);
+      setTextAnimationTrigger(prev => prev + 1); // Trigger text animation
+    }, 800);
+
+    // Step 4: After text animation completes (2.3s total), start video
+    setTimeout(() => {
+      setPlayVideo(true);
+      setIsTransitioning(false);
+      // Don't increment textAnimationTrigger here - we want text to stay in place
+    }, 2300);
   };
 
   const handleCityClick = () => {
@@ -85,6 +147,30 @@ const CitySelector = () => {
     from: { transform: 'scale(0.9)' },
     reset: true,
     key: selectedIndex,
+  });
+
+  // Animation for heart fade in
+  const heartAnimation = useSpring({
+    opacity: showHeart ? 1 :1,
+    config: { tension: 120, friction: 20 },
+  });
+
+  // Animation for city text sliding in from the right edge of the heart
+  const { x: textX, opacity: textOpacity } = useSpring({
+    x: showText ? 0 : 400,
+    opacity: showText ? 1 : 0,
+    reset: true,
+    key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
+    config: { tension: 30, friction: 15 },
+  });
+
+  // Animation for the white panel behind text - slides from left to right (reverse of text)
+  const { x: panelX, opacity: panelOpacity } = useSpring({
+    x: showText ? 0 : -1000,
+    opacity: showText ? 0.6 : 0,
+    reset: true,
+    key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
+    config: { tension: 30, friction: 15 },
   });
 
   return (
@@ -116,20 +202,127 @@ const CitySelector = () => {
               transform: 'translateY(-50%)',
             }}
           >
-            {/* Carousel container with center indicator */}
-            <div className="relative w-full flex justify-center items-center overflow-hidden">
-              {/* Center indicator */}
-              <div 
-                className="absolute z-20 pointer-events-none"
+            {/* Heart-shaped video center indicator WITH city text inside */}
+            <animated.div
+              className="absolute z-20"
+              style={{
+                ...heartAnimation,
+                width: '70vw',
+                height: '70vw',
+                maxWidth: '1400px',
+                maxHeight: '1400px',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              {/* Apply mask to the entire container so everything inside (video + text) is clipped by the heart */}
+              <div
+                className="relative w-full h-full"
                 style={{
-                  width: '272px', // doubled from 136px
-                  height: '168px', // doubled from 84px
-                  border: '3px solid white',
-                  borderRadius: '12px',
-                  boxShadow: '0 0 15px rgba(255,255,255,0.6)',
+                  WebkitMask: 'url(/SelectionHeart.svg) no-repeat center',
+                  mask: 'url(/SelectionHeart.svg) no-repeat center',
+                  WebkitMaskSize: 'contain',
+                  maskSize: 'contain',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center',
                 }}
-              ></div>
-              
+              >
+                {/* Video background */}
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain pointer-events-none"
+                  autoPlay
+                  muted
+                  playsInline
+                >
+                  <source src={selectedCity.video} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+
+                /* Animated City Text */
+                        <animated.div
+                          onClick={handleCityClick}
+                          style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: textX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                          opacity: textOpacity,
+                          pointerEvents: 'auto',
+                          }}
+                          className="cursor-pointer text-white flex flex-col items-center justify-center"
+                        >
+                          {/* Animated white panel behind text */}
+                          <animated.div
+                            style={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              transform: panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                              opacity: panelOpacity,
+                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                              borderRadius: '4px',
+                              padding: '20px 80px',
+                              minWidth: '600px',
+                              minHeight: '150px',
+                              zIndex: -1,
+                              pointerEvents: 'none',
+                            }}
+                            className="backdrop-blur-sm"
+                          />
+                          <animated.div
+                            style={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              transform: panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                              opacity: panelOpacity,
+                              backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                              borderRadius: '4px',
+                              padding: '20px 80px',
+                              minWidth: '600px',
+                              minHeight: '170px',
+                              zIndex: -2,
+                              pointerEvents: 'none',
+                            }}
+                            className="backdrop-blur-sm"
+                          />
+                          
+                          <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:"100px" }}>
+                          {selectedCity.name.toUpperCase()}
+                          </h1>
+                          <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem' }}>EXPLORE</p>
+                        </animated.div>
+
+                        {/* Heart outline overlay for better definition */}
+                <div
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                  style={{
+                    background: 'url(/SelectionHeart.svg) no-repeat center',
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    mixBlendMode: 'multiply',
+                    opacity: 0.1,
+                  }}
+                ></div>
+              </div>
+            </animated.div>
+
+            {/* Carousel container */}
+            <div
+              className="relative w-full flex justify-center items-center overflow-hidden"
+              // This style creates a border that is white and thickest at the center, fading out towards the edges.
+              style={{
+                /* Create a white border that is thickest at the centre and fades towards the edges */
+                // The following creates a border that is thickest and most opaque at the center, fading out to transparent at the edges:
+                // 1. 'border: 4px solid transparent' sets up a 4px border but makes it transparent so the borderImage can show through.
+                // 2. 'borderImage' uses a horizontal linear gradient: fully transparent white at 0% (left edge), fully opaque white at 50% (center), and transparent again at 100% (right edge).
+                //    The '1' at the end is the border image slice value, which means the gradient is stretched to fill the border area.
+                border: '4px solid transparent',
+                borderImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 0%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%) 1',
+              }}
+            >
               {/* Navigation buttons */}
               <button 
                 onClick={handlePrev} 
@@ -168,26 +361,32 @@ const CitySelector = () => {
                   return (
                     <div
                       key={`${city.name}-${index}`}
-                      className="flex-shrink-0 mx-4"
+                      className="flex-shrink-0s"
                       style={{ 
-                        width: '256px', // doubled from 128px
-                        height: '160px' // doubled from 80px
+                        width: `${itemWidth}px`,
+                        height: `${itemHeight}px`,
+                        border: '1px solid transparent',
+                        borderImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%) 1',
+                        // Removed padding to eliminate gaps between images
                       }}
                     >
                       <img 
                         src={city.image} 
                         alt={city.name}
-                        className={`w-64 h-40 object-cover rounded-lg transition-all duration-300 select-none ${
+                        className={`w-full h-full px-[1px] object-cover transition-all duration-300 select-none ${
                           isSelected
-                            ? 'opacity-100 shadow-lg scale-105' 
-                            : 'opacity-60 scale-95'
+                            ? 'opacity-100 shadow-lg scale-100' 
+                            : 'opacity-80 scale-100'
                         }`}
+                        style={{
+                          objectFit: 'cover',
+                          objectPosition: 'center',
+                          minWidth: '100%',
+                          minHeight: '100%',
+                          filter: 'grayscale(0.50)', // Add a little bit of grayscale
+                        }}
                         draggable={false}
                       />
-                      {/* Debug label to show repetitions */}
-                      <div className="text-xs text-center mt-1 text-white/70">
-                        {city.name}
-                      </div>
                     </div>
                   );
                 })}
@@ -217,42 +416,7 @@ const CitySelector = () => {
           </animated.div>
         </div>
 
-        {/* City Text - Centered with higher z-index */}
-        <div 
-          className="fixed z-30 cursor-pointer hover:scale-105 transition-transform duration-300"
-          style={{ 
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
-            width: '300px',
-            height: '300px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'auto',
-          }}
-          onClick={handleCityClick}
-        >
-          {/* Circle background */}
-          <div 
-            style={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              borderRadius: '50%',
-              boxShadow: '0 0 30px rgba(0,0,0,0.4)',
-              backdropFilter: 'blur(5px)',
-              zIndex: -1,
-            }}
-          ></div>
-          
-          {/* City name and explore text */}
-          <h1 className="text-5xl font-bold tracking-wider mb-2">{selectedCity.name.toUpperCase()}</h1>
-          <p className="text-xl font-light tracking-[0.3em]">EXPLORE</p>
-        </div>
+        {/* (Old city text overlay removed ‑ now integrated inside heart) */}
 
         {/* Instruction text with glass panel background */}
         <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
