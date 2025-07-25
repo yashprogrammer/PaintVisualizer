@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSpring, animated } from 'react-spring';
+import { useSpring, useTransition, animated } from 'react-spring';
 import { useNavigate } from 'react-router-dom';
 
 const cities = [
@@ -142,6 +142,14 @@ const CitySelector = () => {
 
   const selectedCity = cities[selectedIndex];
 
+  // Smooth cross-fade transition for blurred background image
+  const bgTransitions = useTransition(selectedCity.blurredImage, {
+    from: { opacity: 0 },
+    enter: { opacity: 1 },
+    leave: { opacity: 0 },
+    config: { duration: 700 },
+  });
+
   const fanAnimation = useSpring({
     transform: 'scale(1)',
     from: { transform: 'scale(0.9)' },
@@ -155,35 +163,40 @@ const CitySelector = () => {
     config: { tension: 120, friction: 20 },
   });
 
-  // Animation for city text sliding in from the right edge of the heart
+  // Animation for city text - slides from right (300px) to center (0px)
   const { x: textX, opacity: textOpacity } = useSpring({
-    x: showText ? 0 : 400,
+    x: showText ? 0 : (isTransitioning ? 0 : 300), // Slide from 300px to center, fade out in place during transition
     opacity: showText ? 1 : 0,
     reset: true,
     key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
-    config: { tension: 30, friction: 15 },
+    config: showText ? 
+      { tension: 30, friction: 15 } : // Slide in slowly from right
+      { tension: 200, friction: 30 }, // Fade out quickly during transition
   });
 
-  // Animation for the white panel behind text - slides from left to right (reverse of text)
+  // Animation for the white panel - slides from left (-300px) to center (0px)
   const { x: panelX, opacity: panelOpacity } = useSpring({
-    x: showText ? 0 : -1000,
+    x: showText ? 0 : (isTransitioning ? 0 : -300), // Slide from -300px to center, fade out in place during transition
     opacity: showText ? 0.6 : 0,
     reset: true,
     key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
-    config: { tension: 30, friction: 15 },
+    config: showText ? 
+      { tension: 30, friction: 15 } : // Slide in slowly from left
+      { tension: 200, friction: 30 }, // Fade out quickly during transition
   });
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
-      <img 
-        src={selectedCity.blurredImage} 
-        alt="Background" 
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{
-          transform: 'scale(1.1)',
-        }}
-      />
+      {bgTransitions((styles, item) => (
+        <animated.img
+          key={item}
+          src={item}
+          alt="Background"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ ...styles, transform: 'scale(1)' }}
+        />
+      ))}
       
       {/* Overlay */}
       <img src="/Overlay.png" alt="Overlay" className="absolute inset-0 w-full h-full object-cover" />
