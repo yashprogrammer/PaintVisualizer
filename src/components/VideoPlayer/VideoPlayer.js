@@ -1,19 +1,77 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import ApiService from '../../services/api';
 
 const VideoPlayer = () => {
   const { city } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const [videoUrl, setVideoUrl] = useState('/City/Video/Video.mp4'); // fallback
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Auto-play the video when component mounts
-    if (videoRef.current) {
+    const fetchVideoUrl = async () => {
+      if (!city) {
+        setError("No city specified");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Special handling for France - prioritize backend data
+        if (city?.toLowerCase().trim() === 'france') {
+          try {
+            const franceData = await ApiService.getFranceData();
+            if (franceData && franceData.videos && franceData.videos.length > 0) {
+              console.log(`Using France-specific video:`, franceData.videos[0]);
+              setVideoUrl(franceData.videos[0]);
+              setLoading(false);
+              return;
+            }
+          } catch (apiError) {
+            console.warn('France API request failed, using fallback video:', apiError.message);
+          }
+        }
+        
+        // For other cities, try general API
+        try {
+          const formattedCountries = await ApiService.getFormattedCountries();
+          const sanitizedCity = city.toLowerCase().trim();
+          const cityData = formattedCountries[sanitizedCity];
+          
+          if (cityData && cityData.videos && cityData.videos.length > 0) {
+            console.log(`Using API video for ${sanitizedCity}:`, cityData.videos[0]);
+            setVideoUrl(cityData.videos[0]);
+          } else {
+            console.log(`No API video found for ${sanitizedCity}, using fallback`);
+          }
+        } catch (apiError) {
+          console.warn('API request failed, using fallback video:', apiError.message);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching video URL:', error);
+        setError(`Failed to load video for ${city}`);
+        setLoading(false);
+      }
+    };
+
+    fetchVideoUrl();
+  }, [city]);
+
+  useEffect(() => {
+    // Auto-play the video when component mounts and video URL is ready
+    if (videoRef.current && !loading) {
+      videoRef.current.load(); // Reload video with new source
       videoRef.current.play().catch(error => {
         console.log('Auto-play failed:', error);
       });
     }
-  }, []);
+  }, [videoUrl, loading]);
 
   const handleVideoEnd = () => {
     // Navigate to hotspots selection after video ends
@@ -24,6 +82,28 @@ const VideoPlayer = () => {
     // Allow users to skip video by clicking
     navigate(`/hotspots/${city}`);
   };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">Loading video...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
+        <div className="text-xl mb-4">Error: {error}</div>
+        <button 
+          onClick={() => navigate('/city-selection')}
+          className="bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          Back to City Selection
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden">
@@ -41,8 +121,7 @@ const VideoPlayer = () => {
           outline: 'none'
         }}
       >
-        {/* For now, using the single video file. Later can be dynamic based on city */}
-        <source src="/City/Video/Video.mp4" type="video/mp4" />
+        <source src={videoUrl} type="video/mp4" />
         Your browser does not support the video tag.
       </video>
       

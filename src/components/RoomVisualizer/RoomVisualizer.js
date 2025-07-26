@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import PaletteSelector from './components/PaletteSelector';
 import Visualizer from './components/Visualizer';
 import RoomOptions from './components/RoomOptions';
 import { roomData } from '../../data/roomData';
+import ApiService from '../../services/api';
 
 const RoomVisualizer = () => {
+  const { city, color } = useParams();
+  
   // State management
   const [currentPalette, setCurrentPalette] = useState(1);
   const [currentRoom, setCurrentRoom] = useState('bedroom');
@@ -21,12 +25,12 @@ const RoomVisualizer = () => {
   );
   const [colorPalettes, setColorPalettes] = useState({
     1: {
-      name: 'Vibrant Cool',
+      name: 'Vibrant',
       colors: [],
       paintColors: []
     },
     2: {
-      name: 'Vibrant Warm',
+      name: 'Calm',
       colors: [],
       paintColors: []
     }
@@ -74,63 +78,111 @@ const RoomVisualizer = () => {
   // Function to load SVG and extract colors
   const loadPaletteColors = async () => {
     try {
-      console.log('Loading SVG colors...');
+      console.log('Loading color palettes for city:', city);
       
-      // Fetch cool.svg
-      const coolResponse = await fetch('/LockUpSvg/cool.svg');
-      const coolSvgContent = await coolResponse.text();
-      console.log('Cool SVG loaded, extracting colors...');
-      const coolColors = extractColorsFromSVG(coolSvgContent);
+      // First, try to get colors from API with special handling for France
+      let vibrantColors = [];
+      let calmColors = [];
+      
+      try {
+        if (city?.toLowerCase().trim() === 'france') {
+          // Special France handling
+          const franceData = await ApiService.getFranceData();
+          if (franceData && franceData.colorPalettes) {
+            vibrantColors = franceData.colorPalettes.vibrant || [];
+            calmColors = franceData.colorPalettes.calm || [];
+            console.log(`Using France-specific color palettes:`, {
+              vibrant: vibrantColors,
+              calm: calmColors
+            });
+          }
+        } else {
+          // General API for other countries
+          const formattedCountries = await ApiService.getFormattedCountries();
+          const sanitizedCity = city?.toLowerCase().trim();
+          const cityData = formattedCountries[sanitizedCity];
+          
+          if (cityData && cityData.colorPalettes) {
+            vibrantColors = cityData.colorPalettes.vibrant || [];
+            calmColors = cityData.colorPalettes.calm || [];
+            console.log(`Using API color palettes for ${sanitizedCity}:`, {
+              vibrant: vibrantColors,
+              calm: calmColors
+            });
+          }
+        }
+      } catch (apiError) {
+        console.warn('API request failed, falling back to SVG colors:', apiError.message);
+      }
+      
+      // If no API colors found, fallback to SVG extraction
+      if (vibrantColors.length === 0 || calmColors.length === 0) {
+        console.log('Loading SVG colors as fallback...');
+        
+        // Fetch cool.svg
+        const coolResponse = await fetch('/LockUpSvg/cool.svg');
+        const coolSvgContent = await coolResponse.text();
+        console.log('Cool SVG loaded, extracting colors...');
+        const coolColors = extractColorsFromSVG(coolSvgContent);
 
-      // Fetch vibrant.svg
-      const vibrantResponse = await fetch('/LockUpSvg/vibrant.svg');
-      const vibrantSvgContent = await vibrantResponse.text();
-      console.log('Vibrant SVG loaded, extracting colors...');
-      const vibrantColors = extractColorsFromSVG(vibrantSvgContent);
+        // Fetch vibrant.svg
+        const vibrantResponse = await fetch('/LockUpSvg/vibrant.svg');
+        const vibrantSvgContent = await vibrantResponse.text();
+        console.log('Vibrant SVG loaded, extracting colors...');
+        const svgVibrantColors = extractColorsFromSVG(vibrantSvgContent);
 
-      console.log('Final cool colors:', coolColors);
+        // Use SVG colors if API didn't provide them
+        if (vibrantColors.length === 0) {
+          vibrantColors = svgVibrantColors.length > 0 ? svgVibrantColors : ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E'];
+        }
+        if (calmColors.length === 0) {
+          calmColors = coolColors.length > 0 ? coolColors : ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E'];
+        }
+      }
+
       console.log('Final vibrant colors:', vibrantColors);
+      console.log('Final calm colors:', calmColors);
 
-      // Update color palettes with extracted colors
+      // Update color palettes with the colors
       setColorPalettes({
         1: {
-          name: 'Vibrant Cool',
-          colors: coolColors,
-          paintColors: coolColors
-        },
-        2: {
-          name: 'Vibrant Warm',
+          name: 'Vibrant',
           colors: vibrantColors,
           paintColors: vibrantColors
+        },
+        2: {
+          name: 'Calm',
+          colors: calmColors,
+          paintColors: calmColors
         }
       });
 
       // Set initial paint color to first color of current palette
-      if (coolColors.length > 0) {
-        setCurrentPaintColor(coolColors[0]);
+      if (vibrantColors.length > 0) {
+        setCurrentPaintColor(vibrantColors[0]);
       }
     } catch (error) {
-      console.error('Error loading SVG colors:', error);
-      // Fallback to default colors if SVG loading fails
+      console.error('Error loading palette colors:', error);
+      // Fallback to default colors
       setColorPalettes({
         1: {
-          name: 'Vibrant Cool',
-          colors: ['#8B5FB5', '#9B6FC5', '#7A9CC6', '#8FA9D0'],
-          paintColors: ['#8B5FB5', '#7A9CC6', '#9B6FC5', '#8FA9D0']
+          name: 'Vibrant',
+          colors: ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E'],
+          paintColors: ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E']
         },
         2: {
-          name: 'Vibrant Warm',
-          colors: ['#A0725C', '#D4956B', '#7A9B6C', '#9BB08A'],
-          paintColors: ['#A0725C', '#D4956B', '#7A9B6C', '#9BB08A']
+          name: 'Calm',
+          colors: ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E'],
+          paintColors: ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E']
         }
       });
     }
   };
 
-  // Load colors when component mounts
+  // Load colors when component mounts or city changes
   useEffect(() => {
     loadPaletteColors();
-  }, []);
+  }, [city]);
 
   // Load mask images for the current room
   useEffect(() => {
