@@ -229,12 +229,21 @@ const CitySelector = () => {
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              {/* Apply mask to the entire container so everything inside (video + text) is clipped by the heart */}
+              {/* Base heart layer */}
+              <div className="absolute inset-0 w-full h-full">
+                <img 
+                  src="/SelectionHeart.svg" 
+                  alt="Heart" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              {/* Masked video layer */}
               <div
                 className="relative w-full h-full"
                 style={{
-                  WebkitMask: 'url(/SelectionHeart.svg) no-repeat center',
-                  mask: 'url(/SelectionHeart.svg) no-repeat center',
+                  WebkitMask: 'url(/SelectionHeartMask.svg) no-repeat center',
+                  mask: 'url(/SelectionHeartMask.svg) no-repeat center',
                   WebkitMaskSize: 'contain',
                   maskSize: 'contain',
                   WebkitMaskPosition: 'center',
@@ -277,7 +286,7 @@ const CitySelector = () => {
                               backgroundColor: 'rgba(255, 255, 255, 0.8)',
                               borderRadius: '4px',
                               padding: '20px 80px',
-                              minWidth: '600px',
+                              minWidth: '700px',
                               minHeight: '150px',
                               zIndex: -1,
                               pointerEvents: 'none',
@@ -294,7 +303,7 @@ const CitySelector = () => {
                               backgroundColor: 'rgba(255, 255, 255, 0.4)',
                               borderRadius: '4px',
                               padding: '20px 80px',
-                              minWidth: '600px',
+                              minWidth: '700px',
                               minHeight: '170px',
                               zIndex: -2,
                               pointerEvents: 'none',
