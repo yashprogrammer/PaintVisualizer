@@ -8,6 +8,7 @@ const Visualizer = ({
   selectedSurface,
   surfaceColors,
   colorPalettes,
+  colorInfo,
   containerRef,
   handleCanvasClick,
   selectPaint,
@@ -33,33 +34,45 @@ const Visualizer = ({
               src={roomData[currentRoom].baseImage} 
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+              style={{ filter: 'grayscale(100%)' }}
             />
             
             {/* Mask overlays for each surface */}
             {roomData[currentRoom].surfaces.map((surface, idx) => {
               const maskLoaded = maskImagesRef.current[surface.id];
-              const surfaceColor = surfaceColors[surface.id] || currentPaintColor;
-              
+              const isSelected = selectedSurface === surface.id;
+              const surfaceColor = surfaceColors[surface.id];
+
+              // Skip rendering if not selected and no colour applied yet
+              if (!isSelected && !surfaceColor) return null;
+
+              const styleObj = {
+                backgroundColor: surfaceColor ? surfaceColor : 'rgba(0,0,0,0.001)', // nearly transparent if no colour, just for shape
+                maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                maskSize: 'cover',
+                WebkitMaskSize: 'cover',
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskPosition: 'center',
+                mixBlendMode: surfaceColor ? 'multiply' : 'normal',
+                zIndex: isSelected ? 100 : idx + 1,
+                pointerEvents: 'none',
+                // Hide overlay if mask hasn't loaded to prevent full-image coloring
+                display: maskLoaded ? 'block' : 'none',
+                transition: 'opacity 0.2s ease',
+              };
+
+              if (isSelected) {
+                styleObj.filter = 'drop-shadow(0 0 3px rgba(255,0,0,0.9)) drop-shadow(0 0 3px rgba(255,0,0,0.9))';
+              }
+
               return (
                 <div
                   key={surface.id}
-                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl transition-opacity duration-200 ${selectedSurface === surface.id ? 'opacity-100' : 'opacity-80'}`}
-                  style={{
-                    backgroundColor: surfaceColor,
-                    maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
-                    WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
-                    maskSize: 'cover',
-                    WebkitMaskSize: 'cover',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat',
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
-                    mixBlendMode: 'multiply',
-                    zIndex: idx + 1,
-                    pointerEvents: 'none',
-                    // Hide overlay if mask hasn't loaded to prevent full-image coloring
-                    display: maskLoaded ? 'block' : 'none',
-                  }}
+                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl ${isSelected ? 'opacity-100' : 'opacity-80'}`}
+                  style={styleObj}
                 />
               );
             })}
@@ -96,24 +109,37 @@ const Visualizer = ({
         {/* Paint Color Swatches */}
         <div className="w-full border-t-[3px] lg:border-t-[5px] border-solid border-[#d2d2d2]">
           <div className="flex flex-row gap-4 lg:gap-[42px] items-center justify-center overflow-hidden px-8 lg:px-16 py-4 lg:py-6 w-full">
-            {colorPalettes[currentPalette]?.paintColors?.map((color, index) => (
-              <div 
-                key={index}
-                className={`aspect-square flex-1 max-w-[80px] lg:max-w-none rounded-bl-[16px] lg:rounded-bl-[24px] rounded-tr-[16px] lg:rounded-tr-[24px] cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => selectPaint(color)}
-              />
-            )) || (
-              // Loading state - show placeholder swatches
-              <div className="flex flex-row gap-4 lg:gap-[42px] items-center justify-center">
-                {[1, 2, 3, 4].map((i) => (
-                  <div 
-                    key={i}
-                    className="aspect-square flex-1 max-w-[80px] lg:max-w-none rounded-bl-[16px] lg:rounded-bl-[24px] rounded-tr-[16px] lg:rounded-tr-[24px] bg-gray-200 animate-pulse"
-                  />
-                ))}
-              </div>
-            )}
+            {Array.from({ length: 4 }).map((_, index) => {
+              const color = (colorPalettes[currentPalette]?.paintColors || [])[index];
+              const isFilled = Boolean(color);
+              const commonClasses = 'aspect-square w-20 lg:w-28 rounded-bl-[16px] lg:rounded-bl-[24px] rounded-tr-[16px] lg:rounded-tr-[24px]';
+ 
+              if (isFilled) {
+                const details = colorInfo?.[color?.toUpperCase()] || {};
+                return (
+                  <div key={index} className="flex flex-col items-center gap-1">
+                    <div
+                      className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => selectPaint(color)}
+                      title={details.name || color}
+                    />
+                    <span className="text-xs text-center whitespace-nowrap max-w-[112px] truncate">{details.name || ''}</span>
+                    {details.detail && (
+                      <span className="text-[10px] text-center whitespace-nowrap italic leading-none max-w-[112px] truncate">{details.detail}</span>
+                    )}
+                  </div>
+                );
+              }
+ 
+              // Placeholder swatch
+              return (
+                <div key={index} className="flex flex-col items-center gap-1">
+                  <div className={`${commonClasses} bg-gray-200`} />
+                  <span className="text-xs">&nbsp;</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
