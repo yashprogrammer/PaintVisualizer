@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import PaletteSelector from './components/PaletteSelector';
 import Visualizer from './components/Visualizer';
 import RoomOptions from './components/RoomOptions';
@@ -7,19 +7,22 @@ import { roomData } from '../../data/roomData';
 import ApiService from '../../services/api';
 
 const RoomVisualizer = () => {
-  const { city, color } = useParams();
+  const { city } = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const queryColorParam = searchParams.get('color');
   
   // State management
   const [currentPalette, setCurrentPalette] = useState(1);
   const [currentRoom, setCurrentRoom] = useState('bedroom');
-  const [currentPaintColor, setCurrentPaintColor] = useState('#d07171');
-  const [selectedSurface, setSelectedSurface] = useState('wall1');
+  // No default paint colour until user selects
+  const [currentPaintColor, setCurrentPaintColor] = useState(null);
+  // No wall is selected initially; user must click a wall first
+  const [selectedSurface, setSelectedSurface] = useState(null);
+  // Surfaces start with no paint applied
   const [surfaceColors, setSurfaceColors] = useState(
     Object.keys(roomData).reduce((acc, roomKey) => {
-      acc[roomKey] = roomData[roomKey].surfaces.reduce((sAcc, s) => {
-        sAcc[s.id] = '#d07171';
-        return sAcc;
-      }, {});
+      acc[roomKey] = {};
       return acc;
     }, {})
   );
@@ -35,6 +38,7 @@ const RoomVisualizer = () => {
       paintColors: []
     }
   });
+  const [colorInfo, setColorInfo] = useState({});
 
   // Refs for canvas operations
   const containerRef = useRef(null);
@@ -98,11 +102,64 @@ const RoomVisualizer = () => {
         throw new Error(`Incomplete palette data for city "${sanitizedCity}"`);
       }
 
+      // Determine initial hotspot colour from route param, if provided
+      let initialColor = null;
+      if (queryColorParam) {
+        try {
+          initialColor = decodeURIComponent(queryColorParam).toUpperCase();
+          if (!initialColor.startsWith('#')) {
+            initialColor = '#' + initialColor.replace(/^#+/, '');
+          }
+        } catch {}
+      }
+
+      let initialPaletteId = 1;
+      if (initialColor) {
+        if (calmColors.map(c => c.toUpperCase()).includes(initialColor)) initialPaletteId = 2;
+        else if (!vibrantColors.map(c => c.toUpperCase()).includes(initialColor)) {
+          // if colour not in predefined lists, still allow prefill but keep palette 1
+        }
+      }
+
+      const buildPaintArray = (paletteColors) => {
+        if (initialColor && initialPaletteId === (paletteColors === vibrantColors ? 1 : 2)) {
+          return [initialColor];
+        }
+        return [];
+      };
+
       setColorPalettes({
-        1: { name: 'Vibrant', colors: vibrantColors, paintColors: vibrantColors },
-        2: { name: 'Calm', colors: calmColors, paintColors: calmColors }
+        1: { name: 'Vibrant', colors: vibrantColors, paintColors: buildPaintArray(vibrantColors) },
+        2: { name: 'Calm', colors: calmColors, paintColors: buildPaintArray(calmColors) }
       });
-      setCurrentPaintColor(vibrantColors[0]);
+
+      if (initialColor) {
+        setCurrentPalette(initialPaletteId);
+        setCurrentPaintColor(initialColor);
+      } else {
+        setCurrentPaintColor(null);
+      }
+
+      // Fetch detailed color info from backend country data
+      try {
+        const backendCountry = await ApiService.getCountryByName(cityData.name);
+        const vibrantDetails = backendCountry.color_pallets?.vibrant || [];
+        const calmDetails = backendCountry.color_pallets?.calm || [];
+        const infoMap = {};
+        [...vibrantDetails, ...calmDetails].forEach((c) => {
+          if (c?.color) {
+            infoMap[c.color.toUpperCase()] = {
+              name: c.name || '',
+              detail: c.detail || c.description || '',
+            };
+          }
+        });
+        setColorInfo(infoMap);
+      } catch (e) {
+        console.warn('Failed to fetch detailed colour info', e);
+      }
+      // No default paint colour; wait for user pick
+      setCurrentPaintColor(null);
     } catch (error) {
       console.error('Failed to load colour palettes:', error);
     }
@@ -197,12 +254,61 @@ const RoomVisualizer = () => {
     }
   };
 
-  // Initialize paint swatches based on current palette
+  // Auto-select first swatch only if none selected yet
   useEffect(() => {
-    if (colorPalettes[currentPalette]?.paintColors?.length > 0) {
+    if (!currentPaintColor && colorPalettes[currentPalette]?.paintColors?.length > 0) {
       setCurrentPaintColor(colorPalettes[currentPalette].paintColors[0]);
     }
-  }, [currentPalette, colorPalettes]);
+  }, [currentPalette, colorPalettes, currentPaintColor]);
+
+  // Handle colour selection from the lock-up SVG (paths)
+  const handleColorPick = (hexColor) => {
+    if (!hexColor) return;
+
+    // 1. Add or replace colour in swatches (max 4)
+    setColorPalettes(prev => {
+      const palette = prev[currentPalette] || {};
+      const existing = palette.paintColors || [];
+
+      // Ignore duplicates completely
+      if (existing.includes(hexColor)) {
+        return prev;
+      }
+
+      let updatedPaint;
+
+      if (existing.length < 4) {
+        // There is still room – push to the next slot
+        updatedPaint = [...existing, hexColor];
+      } else {
+        // Swatches are full – replace the one currently selected by the user
+        const indexToReplace = existing.indexOf(currentPaintColor);
+        if (indexToReplace !== -1) {
+          updatedPaint = [...existing];
+          updatedPaint[indexToReplace] = hexColor;
+        } else {
+          // Fallback: replace the first swatch
+          updatedPaint = [hexColor, ...existing.slice(1)];
+        }
+      }
+
+      return {
+        ...prev,
+        [currentPalette]: {
+          ...palette,
+          paintColors: updatedPaint,
+        },
+      };
+    });
+
+    // 2. Apply colour to selected wall if one is already selected
+    if (selectedSurface) {
+      selectPaint(hexColor);
+    } else {
+      // Otherwise just set it as current paint color for convenience
+      setCurrentPaintColor(hexColor);
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -352,6 +458,7 @@ const RoomVisualizer = () => {
           currentPalette={currentPalette}
           selectPalette={selectPalette}
           colorPalettes={colorPalettes}
+          onColorPick={handleColorPick}
         />
         <Visualizer
           currentRoom={currentRoom}
@@ -360,6 +467,7 @@ const RoomVisualizer = () => {
           selectedSurface={selectedSurface}
           surfaceColors={surfaceColors[currentRoom]}
           colorPalettes={colorPalettes}
+          colorInfo={colorInfo}
           containerRef={containerRef}
           handleCanvasClick={handleCanvasClick}
           selectPaint={selectPaint}

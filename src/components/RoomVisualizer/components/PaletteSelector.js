@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes }) => {
+const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {} }) => {
   const [svgContent, setSvgContent] = React.useState({ 1: null, 2: null });
 
   // Utility to recolor an SVG string given an array of hex colors.
@@ -75,6 +75,21 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes }) => {
     );
   };
 
+  // Determines whether the click event was on an SVG <path>. If so, extract its fill colour
+  const handleContainerClick = (paletteId) => (event) => {
+    const target = event.target;
+    if (target && typeof target.getAttribute === 'function') {
+      const fill = target.getAttribute('fill');
+      const validHex = /^#[0-9A-F]{6}$/i;
+      if (fill && validHex.test(fill)) {
+        onColorPick(fill.toUpperCase());
+        return; // Do not switch palette when picking a colour
+      }
+    }
+    // Fallback: treat as palette selection
+    selectPalette(paletteId);
+  };
+
   return (
     <div className="column-1 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px] w-1/4 flex-shrink-0">
       <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-left w-full">
@@ -87,7 +102,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes }) => {
           <div className="flex flex-col gap-2.5 items-center justify-start w-full">
             <div 
               className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 1 ? 'selected-color' : ''}`}
-              onClick={() => selectPalette(1)}
+              onClick={handleContainerClick(1)}
             >
               {renderPaletteSvg(1, 'Cool Palette')}
             </div>
@@ -100,7 +115,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes }) => {
           <div className="flex flex-col gap-2.5 items-center justify-start w-full">
             <div 
               className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 2 ? 'selected-color' : ''}`}
-              onClick={() => selectPalette(2)}
+              onClick={handleContainerClick(2)}
             >
               {renderPaletteSvg(2, 'Vibrant Palette')}
             </div>
