@@ -31,14 +31,10 @@ const HotspotSelector = () => {
       try {
         setLoading(true);
         
-        console.log(`Attempting to fetch ${sanitizedCity} data from API...`);
+        console.log(`Loading cached data for ${sanitizedCity}...`);
+
+        const cityData = await ApiService.getCityData(sanitizedCity);
         
-        // Get the country data and transform it
-        const countryData = await ApiService.getCountryByName(sanitizedCity);
-        console.log('Raw country data from API:', countryData);
-        
-        const transformedData = ApiService.transformCountryData(countryData);
-        const cityData = transformedData[sanitizedCity];
         
         if (cityData) {
           console.log(`Successfully loaded API data for ${sanitizedCity}:`, cityData);
@@ -46,7 +42,7 @@ const HotspotSelector = () => {
           setLoading(false);
           return;
         } else {
-          setError(`Failed to transform data for ${sanitizedCity}`);
+          setError(`No data found for ${sanitizedCity}`);
           setLoading(false);
           return;
         }
@@ -129,7 +125,7 @@ const HotspotSelector = () => {
       
 
       {/* Hotspots */}
-      {imageLoaded && cityData.hotspots.map((hotspot) => (
+      {cityData.hotspots.map((hotspot) => (
         <button
           key={hotspot.id}
           onClick={() => handleHotspotClick(hotspot)}

@@ -78,104 +78,33 @@ const RoomVisualizer = () => {
   // Function to load SVG and extract colors
   const loadPaletteColors = async () => {
     try {
-      console.log('Loading color palettes for city:', city);
-      
-      // First, try to get colors from API with special handling for France
-      let vibrantColors = [];
-      let calmColors = [];
-      
-      try {
-        if (city?.toLowerCase().trim() === 'france') {
-          // Special France handling
-          const franceData = await ApiService.getFranceData();
-          if (franceData && franceData.colorPalettes) {
-            vibrantColors = franceData.colorPalettes.vibrant || [];
-            calmColors = franceData.colorPalettes.calm || [];
-            console.log(`Using France-specific color palettes:`, {
-              vibrant: vibrantColors,
-              calm: calmColors
-            });
-          }
-        } else {
-          // General API for other countries
-          const formattedCountries = await ApiService.getFormattedCountries();
-          const sanitizedCity = city?.toLowerCase().trim();
-          const cityData = formattedCountries[sanitizedCity];
-          
-          if (cityData && cityData.colorPalettes) {
-            vibrantColors = cityData.colorPalettes.vibrant || [];
-            calmColors = cityData.colorPalettes.calm || [];
-            console.log(`Using API color palettes for ${sanitizedCity}:`, {
-              vibrant: vibrantColors,
-              calm: calmColors
-            });
-          }
-        }
-      } catch (apiError) {
-        console.warn('API request failed, falling back to SVG colors:', apiError.message);
+      const sanitizedCity = city?.toLowerCase().replace(/'/g,'').trim();
+      const cityData = await ApiService.getCityData(sanitizedCity);
+      if (!cityData || !cityData.colorPalettes) {
+        throw new Error(`No color palette data found for city "${sanitizedCity}"`);
       }
-      
-      // If no API colors found, fallback to SVG extraction
+
+      let vibrantColors = cityData.colorPalettes.vibrant || [];
+      let calmColors = cityData.colorPalettes.calm || [];
+
+      // If API palettes empty, try deriving from hotspots colours as fallback
       if (vibrantColors.length === 0 || calmColors.length === 0) {
-        console.log('Loading SVG colors as fallback...');
-        
-        // Fetch cool.svg
-        const coolResponse = await fetch('/LockUpSvg/cool.svg');
-        const coolSvgContent = await coolResponse.text();
-        console.log('Cool SVG loaded, extracting colors...');
-        const coolColors = extractColorsFromSVG(coolSvgContent);
-
-        // Fetch vibrant.svg
-        const vibrantResponse = await fetch('/LockUpSvg/vibrant.svg');
-        const vibrantSvgContent = await vibrantResponse.text();
-        console.log('Vibrant SVG loaded, extracting colors...');
-        const svgVibrantColors = extractColorsFromSVG(vibrantSvgContent);
-
-        // Use SVG colors if API didn't provide them
-        if (vibrantColors.length === 0) {
-          vibrantColors = svgVibrantColors.length > 0 ? svgVibrantColors : ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E'];
-        }
-        if (calmColors.length === 0) {
-          calmColors = coolColors.length > 0 ? coolColors : ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E'];
-        }
+        const allHotspotColors = cityData.hotspots?.map(h => h.color) || [];
+        vibrantColors = allHotspotColors.slice(0, 4);
+        calmColors = allHotspotColors.slice(4, 8);
       }
 
-      console.log('Final vibrant colors:', vibrantColors);
-      console.log('Final calm colors:', calmColors);
+      if (vibrantColors.length === 0 || calmColors.length === 0) {
+        throw new Error(`Incomplete palette data for city "${sanitizedCity}"`);
+      }
 
-      // Update color palettes with the colors
       setColorPalettes({
-        1: {
-          name: 'Vibrant',
-          colors: vibrantColors,
-          paintColors: vibrantColors
-        },
-        2: {
-          name: 'Calm',
-          colors: calmColors,
-          paintColors: calmColors
-        }
+        1: { name: 'Vibrant', colors: vibrantColors, paintColors: vibrantColors },
+        2: { name: 'Calm', colors: calmColors, paintColors: calmColors }
       });
-
-      // Set initial paint color to first color of current palette
-      if (vibrantColors.length > 0) {
-        setCurrentPaintColor(vibrantColors[0]);
-      }
+      setCurrentPaintColor(vibrantColors[0]);
     } catch (error) {
-      console.error('Error loading palette colors:', error);
-      // Fallback to default colors
-      setColorPalettes({
-        1: {
-          name: 'Vibrant',
-          colors: ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E'],
-          paintColors: ['#C4BBBC', '#E8E4DE', '#B8B5A8', '#9B968E']
-        },
-        2: {
-          name: 'Calm',
-          colors: ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E'],
-          paintColors: ['#E8E4DE', '#C4BBBC', '#B8B5A8', '#9B968E']
-        }
-      });
+      console.error('Failed to load colour palettes:', error);
     }
   };
 
@@ -422,6 +351,7 @@ const RoomVisualizer = () => {
         <PaletteSelector
           currentPalette={currentPalette}
           selectPalette={selectPalette}
+          colorPalettes={colorPalettes}
         />
         <Visualizer
           currentRoom={currentRoom}

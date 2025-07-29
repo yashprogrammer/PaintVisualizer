@@ -20,41 +20,21 @@ const VideoPlayer = () => {
 
       try {
         setLoading(true);
-        
-        // Special handling for France - prioritize backend data
-        if (city?.toLowerCase().trim() === 'france') {
-          try {
-            const franceData = await ApiService.getFranceData();
-            if (franceData && franceData.videos && franceData.videos.length > 0) {
-              console.log(`Using France-specific video:`, franceData.videos[0]);
-              setVideoUrl(franceData.videos[0]);
-              setLoading(false);
-              return;
-            }
-          } catch (apiError) {
-            console.warn('France API request failed, using fallback video:', apiError.message);
-          }
+
+        // Fetch cached video list
+        const sanitizedCity = city.toLowerCase().trim();
+        const cityData = await ApiService.getCityData(sanitizedCity);
+
+        if (cityData && cityData.videos && cityData.videos.length > 0) {
+          console.log(`Using cached video for ${sanitizedCity}:`, cityData.videos[0]);
+          setVideoUrl(cityData.videos[0]);
+        } else {
+          console.log(`No cached video for ${sanitizedCity}, using fallback`);
         }
-        
-        // For other cities, try general API
-        try {
-          const formattedCountries = await ApiService.getFormattedCountries();
-          const sanitizedCity = city.toLowerCase().trim();
-          const cityData = formattedCountries[sanitizedCity];
-          
-          if (cityData && cityData.videos && cityData.videos.length > 0) {
-            console.log(`Using API video for ${sanitizedCity}:`, cityData.videos[0]);
-            setVideoUrl(cityData.videos[0]);
-          } else {
-            console.log(`No API video found for ${sanitizedCity}, using fallback`);
-          }
-        } catch (apiError) {
-          console.warn('API request failed, using fallback video:', apiError.message);
-        }
-        
+
         setLoading(false);
-      } catch (error) {
-        console.error('Error fetching video URL:', error);
+      } catch (err) {
+        console.error('Error fetching video URL:', err);
         setError(`Failed to load video for ${city}`);
         setLoading(false);
       }
@@ -95,7 +75,7 @@ const VideoPlayer = () => {
     return (
       <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
         <div className="text-xl mb-4">Error: {error}</div>
-        <button 
+        <button
           onClick={() => navigate('/city-selection')}
           className="bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
@@ -124,17 +104,15 @@ const VideoPlayer = () => {
         <source src={videoUrl} type="video/mp4" />
         Your browser does not support the video tag.
       </video>
-      
       {/* Skip indicator */}
       <div className="absolute top-4 right-4 z-10">
-        <button 
+        <button
           onClick={handleVideoClick}
           className="bg-black/50 text-white px-4 py-2 rounded-lg backdrop-blur-sm hover:bg-black/70 transition-colors"
         >
           Skip →
         </button>
       </div>
-      
       {/* City indicator */}
       <div className="absolute bottom-4 left-4 z-10">
         <div className="bg-black/50 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
