@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCityData } from '../../data/cities';
+import ApiService from '../../services/api';
 
 const HotspotSelector = () => {
   const { city } = useParams();
@@ -9,33 +9,52 @@ const HotspotSelector = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [usingApiData, setUsingApiData] = useState(true); // Always using API data now
 
   useEffect(() => {
-    // Validate and sanitize city parameter
-    if (!city) {
-      setError("No city specified");
-      setLoading(false);
-      return;
-    }
+    const fetchCityData = async () => {
+      // Validate and sanitize city parameter
+      if (!city) {
+        setError("No city specified");
+        setLoading(false);
+        return;
+      }
 
-    // Sanitize city name to prevent XSS and path traversal
-    const sanitizedCity = city.replace(/[<>/"'&]/g, '').toLowerCase().trim();
-    if (sanitizedCity !== city.toLowerCase().trim()) {
-      setError("Invalid city parameter");
-      setLoading(false);
-      return;
-    }
+      // Sanitize city name to prevent XSS and path traversal
+      const sanitizedCity = city.replace(/[<>/"'&]/g, '').toLowerCase().trim();
+      if (sanitizedCity !== city.toLowerCase().trim()) {
+        setError("Invalid city parameter");
+        setLoading(false);
+        return;
+      }
 
-    // Get city data
-    const data = getCityData(sanitizedCity);
-    if (!data) {
-      setError(`City "${city}" not found`);
-      setLoading(false);
-      return;
-    }
+      try {
+        setLoading(true);
+        
+        console.log(`Loading cached data for ${sanitizedCity}...`);
 
-    setCityData(data);
-    setLoading(false);
+        const cityData = await ApiService.getCityData(sanitizedCity);
+        
+        
+        if (cityData) {
+          console.log(`Successfully loaded API data for ${sanitizedCity}:`, cityData);
+          setCityData(cityData);
+          setLoading(false);
+          return;
+        } else {
+          setError(`No data found for ${sanitizedCity}`);
+          setLoading(false);
+          return;
+        }
+        
+      } catch (error) {
+        console.error('Error fetching city data:', error);
+        setError(`Failed to load data for ${city}: ${error.message}`);
+        setLoading(false);
+      }
+    };
+
+    fetchCityData();
   }, [city]);
 
   const handleHotspotClick = (hotspot) => {
@@ -66,6 +85,9 @@ const HotspotSelector = () => {
     return (
       <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
         <div className="text-xl mb-4">Error: {error}</div>
+        <div className="text-sm mb-4 opacity-70">
+          Make sure the backend server is running on port 15205
+        </div>
         <button 
           onClick={() => navigate('/city-selection')}
           className="bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -103,7 +125,7 @@ const HotspotSelector = () => {
       
 
       {/* Hotspots */}
-      {imageLoaded && cityData.hotspots.map((hotspot) => (
+      {cityData.hotspots.map((hotspot) => (
         <button
           key={hotspot.id}
           onClick={() => handleHotspotClick(hotspot)}
@@ -170,6 +192,10 @@ const HotspotSelector = () => {
           <span className="text-lg font-semibold tracking-wider">
             {cityData.name.toUpperCase()}
           </span>
+          {/* Data source indicator */}
+          <div className="text-xs mt-1 opacity-70">
+            {usingApiData ? '🌐 API Data' : '📁 Static Data'}
+          </div>
         </div>
       </div>
     </div>

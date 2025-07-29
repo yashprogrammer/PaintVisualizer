@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ApiService from '../../services/api';
 
 const cityImages = [
   '/City/Bali H Small.png',
@@ -24,6 +25,15 @@ const WelcomeScreen = () => {
   const duration = 3000; // 3 seconds
   const loop = false;
   const MIN_DISTANCE = 200; // 3rem = 48px (assuming 1rem = 16px)
+
+  // Preload raw countries data once when the welcome screen mounts. The ApiService handles
+  // storing the response in both memory and localStorage so downstream components can
+  // access it without additional network calls.
+  useEffect(() => {
+    ApiService.getCountries().catch((err) => {
+      console.error('Failed to preload countries data:', err);
+    });
+  }, []);
 
   const handleNavigate = () => {
     navigate('/city-selection');

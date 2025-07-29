@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import PaletteSelector from './components/PaletteSelector';
 import Visualizer from './components/Visualizer';
 import RoomOptions from './components/RoomOptions';
 import { roomData } from '../../data/roomData';
+import ApiService from '../../services/api';
 
 const RoomVisualizer = () => {
+  const { city, color } = useParams();
+  
   // State management
   const [currentPalette, setCurrentPalette] = useState(1);
   const [currentRoom, setCurrentRoom] = useState('bedroom');
@@ -21,12 +25,12 @@ const RoomVisualizer = () => {
   );
   const [colorPalettes, setColorPalettes] = useState({
     1: {
-      name: 'Vibrant Cool',
+      name: 'Vibrant',
       colors: [],
       paintColors: []
     },
     2: {
-      name: 'Vibrant Warm',
+      name: 'Calm',
       colors: [],
       paintColors: []
     }
@@ -74,63 +78,40 @@ const RoomVisualizer = () => {
   // Function to load SVG and extract colors
   const loadPaletteColors = async () => {
     try {
-      console.log('Loading SVG colors...');
-      
-      // Fetch cool.svg
-      const coolResponse = await fetch('/LockUpSvg/cool.svg');
-      const coolSvgContent = await coolResponse.text();
-      console.log('Cool SVG loaded, extracting colors...');
-      const coolColors = extractColorsFromSVG(coolSvgContent);
-
-      // Fetch vibrant.svg
-      const vibrantResponse = await fetch('/LockUpSvg/vibrant.svg');
-      const vibrantSvgContent = await vibrantResponse.text();
-      console.log('Vibrant SVG loaded, extracting colors...');
-      const vibrantColors = extractColorsFromSVG(vibrantSvgContent);
-
-      console.log('Final cool colors:', coolColors);
-      console.log('Final vibrant colors:', vibrantColors);
-
-      // Update color palettes with extracted colors
-      setColorPalettes({
-        1: {
-          name: 'Vibrant Cool',
-          colors: coolColors,
-          paintColors: coolColors
-        },
-        2: {
-          name: 'Vibrant Warm',
-          colors: vibrantColors,
-          paintColors: vibrantColors
-        }
-      });
-
-      // Set initial paint color to first color of current palette
-      if (coolColors.length > 0) {
-        setCurrentPaintColor(coolColors[0]);
+      const sanitizedCity = city?.toLowerCase().replace(/'/g,'').trim();
+      const cityData = await ApiService.getCityData(sanitizedCity);
+      if (!cityData || !cityData.colorPalettes) {
+        throw new Error(`No color palette data found for city "${sanitizedCity}"`);
       }
-    } catch (error) {
-      console.error('Error loading SVG colors:', error);
-      // Fallback to default colors if SVG loading fails
+
+      let vibrantColors = cityData.colorPalettes.vibrant || [];
+      let calmColors = cityData.colorPalettes.calm || [];
+
+      // If API palettes empty, try deriving from hotspots colours as fallback
+      if (vibrantColors.length === 0 || calmColors.length === 0) {
+        const allHotspotColors = cityData.hotspots?.map(h => h.color) || [];
+        vibrantColors = allHotspotColors.slice(0, 4);
+        calmColors = allHotspotColors.slice(4, 8);
+      }
+
+      if (vibrantColors.length === 0 || calmColors.length === 0) {
+        throw new Error(`Incomplete palette data for city "${sanitizedCity}"`);
+      }
+
       setColorPalettes({
-        1: {
-          name: 'Vibrant Cool',
-          colors: ['#8B5FB5', '#9B6FC5', '#7A9CC6', '#8FA9D0'],
-          paintColors: ['#8B5FB5', '#7A9CC6', '#9B6FC5', '#8FA9D0']
-        },
-        2: {
-          name: 'Vibrant Warm',
-          colors: ['#A0725C', '#D4956B', '#7A9B6C', '#9BB08A'],
-          paintColors: ['#A0725C', '#D4956B', '#7A9B6C', '#9BB08A']
-        }
+        1: { name: 'Vibrant', colors: vibrantColors, paintColors: vibrantColors },
+        2: { name: 'Calm', colors: calmColors, paintColors: calmColors }
       });
+      setCurrentPaintColor(vibrantColors[0]);
+    } catch (error) {
+      console.error('Failed to load colour palettes:', error);
     }
   };
 
-  // Load colors when component mounts
+  // Load colors when component mounts or city changes
   useEffect(() => {
     loadPaletteColors();
-  }, []);
+  }, [city]);
 
   // Load mask images for the current room
   useEffect(() => {
@@ -370,6 +351,7 @@ const RoomVisualizer = () => {
         <PaletteSelector
           currentPalette={currentPalette}
           selectPalette={selectPalette}
+          colorPalettes={colorPalettes}
         />
         <Visualizer
           currentRoom={currentRoom}
