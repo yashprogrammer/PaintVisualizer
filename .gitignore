@@ -36,3 +36,5 @@ AssetsByClient/
 .cursorrules
 .DS_Store
 TestCases_Phase5_HotspotSelection.md
+
+response.json
