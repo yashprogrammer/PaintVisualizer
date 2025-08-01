@@ -9,6 +9,8 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
     try {
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(rawSvg, 'image/svg+xml');
+      // Add a class to the root SVG element so we can target paths for hover effects
+      xmlDoc.documentElement.setAttribute('class', 'lockup-svg');
       const paths = Array.from(xmlDoc.querySelectorAll('path'));
       if (paths.length === 0 || colors.length === 0) return rawSvg; // nothing to recolor or no colors
       paths.forEach((p, idx) => {

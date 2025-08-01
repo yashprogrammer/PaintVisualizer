@@ -12,6 +12,7 @@ const Visualizer = ({
   containerRef,
   handleCanvasClick,
   selectPaint,
+  removePaint,
   isMasksLoaded,
   maskImagesRef
 }) => {
@@ -101,7 +102,7 @@ const Visualizer = ({
             )}
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center">
-            <p className="block leading-normal">Click on surfaces to select and paint</p>
+            <p className="block leading-normal">Select surface to paint</p>
           </div>
         </div>
         
@@ -116,13 +117,33 @@ const Visualizer = ({
               if (isFilled) {
                 const details = colorInfo?.[color?.toUpperCase()] || {};
                 return (
-                  <div key={index} className="flex flex-col items-center gap-1">
-                    <div
-                      className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => selectPaint(color)}
-                      title={details.name || color}
-                    />
+                  <div key={index} className="flex flex-col items-center gap-1 swatch-item">
+                    <div className="relative swatch-container">
+                      <div
+                        className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => selectPaint(color)}
+                        title={details.name || color}
+                      />
+                      <div
+                        className="absolute -top-1 -right-1 bg-black bg-opacity-80 rounded-full p-1 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removePaint(index);
+                        }}
+                        title="Remove colour"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 12 12"
+                          width="15"
+                          height="15"
+                        >
+                          <line x1="2" y1="2" x2="10" y2="10" stroke="white" strokeWidth="2" />
+                          <line x1="10" y1="2" x2="2" y2="10" stroke="white" strokeWidth="2" />
+                        </svg>
+                      </div>
+                    </div>
                     <span className="text-xs text-center whitespace-nowrap max-w-[112px] truncate">{details.name || ''}</span>
                     {details.detail && (
                       <span className="text-[10px] text-center whitespace-nowrap italic leading-none max-w-[112px] truncate">{details.detail}</span>
@@ -133,7 +154,7 @@ const Visualizer = ({
  
               // Placeholder swatch
               return (
-                <div key={index} className="flex flex-col items-center gap-1">
+                <div key={index} className="flex flex-col items-center gap-1 swatch-item">
                   <div className={`${commonClasses} bg-gray-200`} />
                   <span className="text-xs">&nbsp;</span>
                 </div>

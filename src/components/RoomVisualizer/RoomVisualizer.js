@@ -366,6 +366,51 @@ const RoomVisualizer = () => {
     }));
   };
 
+  // Remove a paint colour from the current palette shortlist
+  const removePaint = (index) => {
+    setColorPalettes(prev => {
+      const palette = prev[currentPalette] || {};
+      const paintColors = palette.paintColors || [];
+      if (index < 0 || index >= paintColors.length) return prev;
+
+      const colorToRemove = paintColors[index];
+      const updatedPaint = paintColors.filter((_, idx) => idx !== index);
+
+      // If the removed colour was currently selected, clear the selection
+      if (currentPaintColor === colorToRemove) {
+        setCurrentPaintColor(null);
+      }
+
+      // Remove the colour from any surfaces that currently use it across all rooms
+      setSurfaceColors(prevSurf => {
+        const updatedSurf = { ...prevSurf };
+        Object.keys(updatedSurf).forEach(roomKey => {
+          const roomSurfaces = { ...updatedSurf[roomKey] };
+          let changed = false;
+          Object.keys(roomSurfaces).forEach(surfaceId => {
+            if (roomSurfaces[surfaceId] === colorToRemove) {
+              delete roomSurfaces[surfaceId];
+              changed = true;
+            }
+          });
+          if (changed) {
+            updatedSurf[roomKey] = roomSurfaces;
+          }
+        });
+        return updatedSurf;
+      });
+
+      return {
+        ...prev,
+        [currentPalette]: {
+          ...palette,
+          paintColors: updatedPaint,
+        },
+      };
+    });
+  };
+
+
   const selectRoom = (roomType) => {
     setCurrentRoom(roomType);
   };
@@ -378,19 +423,29 @@ const RoomVisualizer = () => {
           background-size: 40px 40px;
         }
         .selected-color {
-          box-shadow: 0 0 0 4px #3B82F6;
+          /* Blue selection border removed */
         }
         .room-surface:hover {
           filter: brightness(1.1);
           transition: filter 0.2s ease;
         }
-        .paint-swatch:hover {
+        /* Scale swatch and its remove icon together */
+        .swatch-item:hover {
           transform: scale(1.1);
           transition: transform 0.2s ease;
+          transform-origin: center;
         }
         .palette-container:hover {
-          transform: scale(1.02);
+          /* No scaling of the entire lockup on hover */
+        }
+
+        /* Scale individual paths in the lock-up SVG */
+        .lockup-svg path {
           transition: transform 0.2s ease;
+          transform-origin: center;
+        }
+        .lockup-svg path:hover {
+          transform: scale(1.12);
         }
         .room-option:hover > div:first-child {
           transform: scale(1.05);
@@ -473,6 +528,7 @@ const RoomVisualizer = () => {
           selectPaint={selectPaint}
           isMasksLoaded={isMasksLoaded}
           maskImagesRef={maskImagesRef}
+          removePaint={removePaint}
         />
         <RoomOptions
           currentRoom={currentRoom}

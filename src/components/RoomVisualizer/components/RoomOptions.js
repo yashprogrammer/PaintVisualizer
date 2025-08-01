@@ -14,7 +14,7 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
           {Object.entries(roomData).map(([roomKey, room], index) => (
             <div 
               key={roomKey}
-              className={`flex flex-col gap-2.5 items-center justify-start w-full room-option cursor-pointer flex-1 min-h-0 ${currentRoom === roomKey ? 'ring-2 lg:ring-4 ring-blue-500' : ''}`}
+              className={`flex flex-col gap-2.5 items-center justify-start w-full room-option cursor-pointer flex-1 min-h-0`}
               onClick={() => selectRoom(roomKey)}
               style={{ minHeight: 0 }}
             >
