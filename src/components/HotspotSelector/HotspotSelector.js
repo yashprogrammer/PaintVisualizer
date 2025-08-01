@@ -178,7 +178,7 @@ const HotspotSelector = () => {
       {/* Back Button */}
       <div className="absolute top-8 left-8 z-20">
         <button 
-          onClick={() => navigate(`/video/${city}`)}
+          onClick={() => navigate(`/city-selection`)}
           className="bg-black bg-opacity-50 text-white w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-opacity-70 transition-colors"
           aria-label="Go back to video"
         >

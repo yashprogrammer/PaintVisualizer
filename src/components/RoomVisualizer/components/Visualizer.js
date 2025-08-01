@@ -34,7 +34,6 @@ const Visualizer = ({
               src={roomData[currentRoom].baseImage} 
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
-              style={{ filter: 'grayscale(100%)' }}
             />
             
             {/* Mask overlays for each surface */}

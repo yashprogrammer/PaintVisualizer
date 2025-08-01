@@ -18,6 +18,7 @@ const cities = [
 const CitySelector = () => {
   const navigate = useNavigate();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [displayedCityIndex, setDisplayedCityIndex] = useState(0); // controls the city name shown in text
   const [currentPosition, setCurrentPosition] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHeart, setShowHeart] = useState(true);
@@ -73,7 +74,8 @@ const CitySelector = () => {
 
   const handlePrev = () => {
     if (isTransitioning) return;
-    startAnimationSequence();
+    const newIndex = selectedIndex === 0 ? cities.length - 1 : selectedIndex - 1;
+    startAnimationSequence(newIndex);
     
     setCurrentPosition(prev => {
       const newPos = prev - 1;
@@ -81,12 +83,13 @@ const CitySelector = () => {
       return newPos < 0 ? infiniteCities.length - 1 : newPos;
     });
     
-    setSelectedIndex((prev) => (prev === 0 ? cities.length - 1 : prev - 1));
+    setSelectedIndex(newIndex);
   };
 
   const handleNext = () => {
     if (isTransitioning) return;
-    startAnimationSequence();
+    const newIndex = selectedIndex === cities.length - 1 ? 0 : selectedIndex + 1;
+    startAnimationSequence(newIndex);
     
     setCurrentPosition(prev => {
       const newPos = prev + 1;
@@ -94,10 +97,10 @@ const CitySelector = () => {
       return newPos >= infiniteCities.length ? 0 : newPos;
     });
     
-    setSelectedIndex((prev) => (prev === cities.length - 1 ? 0 : prev + 1));
+    setSelectedIndex(newIndex);
   };
 
-  const startAnimationSequence = () => {
+  const startAnimationSequence = (nextDisplayIndex) => {
     setIsTransitioning(true);
     setShowHeart(false);
     setShowText(false);
@@ -118,6 +121,8 @@ const CitySelector = () => {
 
     // Step 3: After heart fades in (0.8s total), show text and panel
     setTimeout(() => {
+      // after slide-out completes, update displayed city and slide new one in
+      setDisplayedCityIndex(nextDisplayIndex);
       setShowText(true);
       setTextAnimationTrigger(prev => prev + 1); // Trigger text animation
     }, 800);
@@ -141,6 +146,7 @@ const CitySelector = () => {
   const translateX = centerOffset - (currentPosition * itemWidth);
 
   const selectedCity = cities[selectedIndex];
+  const displayedCity = cities[displayedCityIndex];
 
   // Smooth cross-fade transition for blurred background image
   const bgTransitions = useTransition(selectedCity.blurredImage, {
@@ -157,32 +163,30 @@ const CitySelector = () => {
     key: selectedIndex,
   });
 
-  // Animation for heart fade in
+  // Heart visibility (no fade animation, updates instantly)
   const heartAnimation = useSpring({
-    opacity: showHeart ? 1 :1,
-    config: { tension: 120, friction: 20 },
+    opacity: showHeart ? 1 : 1,
+    immediate: true, // change instantly without interpolation
   });
 
-  // Animation for city text - slides from right (300px) to center (0px)
-  const { x: textX, opacity: textOpacity } = useSpring({
-    x: showText ? 0 : (isTransitioning ? 0 : 300), // Slide from 300px to center, fade out in place during transition
-    opacity: showText ? 1 : 0,
-    reset: true,
-    key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
-    config: showText ? 
-      { tension: 30, friction: 15 } : // Slide in slowly from right
-      { tension: 200, friction: 30 }, // Fade out quickly during transition
+  // Animation for city text - slide-in / fade-out pattern
+  const textAnimation = useSpring({
+    from: showText ? { x: 500, opacity: 1 } : { x: 0, opacity: 1 },
+    to: showText ? { x: 0, opacity: 1 } : { x: 0, opacity: 0 },
+    reset: showText, // Reset animation when showing (to trigger slide-in)
+    key: textAnimationTrigger,
+    config: (key) => key === "x" ? { tension: 30, friction: 15 } : { tension: 280, friction: 30 },
+    immediate: (key) => showText ? key === "opacity" : key === "x", // When showing: don't animate opacity, When hiding: don't animate x
   });
 
-  // Animation for the white panel - slides from left (-300px) to center (0px)
-  const { x: panelX, opacity: panelOpacity } = useSpring({
-    x: showText ? 0 : (isTransitioning ? 0 : -300), // Slide from -300px to center, fade out in place during transition
-    opacity: showText ? 0.6 : 0,
-    reset: true,
-    key: textAnimationTrigger, // Use textAnimationTrigger to control when animation resets
-    config: showText ? 
-      { tension: 30, friction: 15 } : // Slide in slowly from left
-      { tension: 200, friction: 30 }, // Fade out quickly during transition
+  // Animation for the white panel - slide-in / fade-out pattern  
+  const panelAnimation = useSpring({
+    from: showText ? { x: -300, opacity: 1 } : { x: 0, opacity: 1 },
+    to: showText ? { x: 0, opacity: 1 } : { x: 0, opacity: 0 },
+    reset: showText, // Reset animation when showing (to trigger slide-in)
+    key: textAnimationTrigger,
+    config: (key) => key === "x" ? { tension: 30, friction: 15 } : { tension: 280, friction: 30 },
+    immediate: (key) => showText ? key === "opacity" : key === "x", // When showing: don't animate opacity, When hiding: don't animate x
   });
 
   return (
@@ -269,8 +273,8 @@ const CitySelector = () => {
                           position: 'absolute',
                           top: '50%',
                           left: '50%',
-                          transform: textX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                          opacity: textOpacity,
+                          transform: textAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                          opacity: textAnimation.opacity,
                           pointerEvents: 'auto',
                           }}
                           className="cursor-pointer text-white flex flex-col items-center justify-center"
@@ -281,8 +285,8 @@ const CitySelector = () => {
                               position: 'absolute',
                               top: '50%',
                               left: '50%',
-                              transform: panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                              opacity: panelOpacity,
+                              transform: panelAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                              opacity: panelAnimation.opacity.to((val) => val * 0.8), // Apply base opacity of 0.8 to the animated value
                               backgroundColor: 'rgba(255, 255, 255, 0.8)',
                               borderRadius: '4px',
                               padding: '20px 80px',
@@ -298,8 +302,8 @@ const CitySelector = () => {
                               position: 'absolute',
                               top: '50%',
                               left: '50%',
-                              transform: panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                              opacity: panelOpacity,
+                              transform: panelAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                              opacity: panelAnimation.opacity.to((val) => val * 0.4), // Apply base opacity of 0.4 to the animated value
                               backgroundColor: 'rgba(255, 255, 255, 0.4)',
                               borderRadius: '4px',
                               padding: '20px 80px',
@@ -312,7 +316,7 @@ const CitySelector = () => {
                           />
                           
                           <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:"100px" }}>
-                          {selectedCity.name.toUpperCase()}
+                          {displayedCity.name.toUpperCase()}
                           </h1>
                           <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem' }}>EXPLORE</p>
                         </animated.div>
