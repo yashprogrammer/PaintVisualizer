@@ -25,6 +25,15 @@ const CitySelector = () => {
   const [showText, setShowText] = useState(true);
   const [playVideo, setPlayVideo] = useState(true);
   const [animationKey, setAnimationKey] = useState(0); // Add animation key state
+
+  // Retrieve preloaded video from localStorage if available
+  const getVideoSource = (city) => {
+    if (typeof window === 'undefined') return city.video;
+    if (typeof window !== 'undefined' && window.cityVideoUrls && window.cityVideoUrls[city.name]) {
+      return window.cityVideoUrls[city.name];
+    }
+    return city.video;
+  };
   const [textAnimationTrigger, setTextAnimationTrigger] = useState(0); // Separate trigger for text animation
   const itemWidth = typeof window !== 'undefined' ? (window.innerWidth / 4) : 375; // 1/4 of viewport width for 4 images
   const itemHeight = 180; // Reduced height to make images more rectangular (16:9 aspect ratio)
@@ -45,7 +54,7 @@ const CitySelector = () => {
   useEffect(() => {
     if (videoRef.current) {
       const selectedCity = cities[selectedIndex];
-      videoRef.current.src = selectedCity.video;
+      videoRef.current.src = getVideoSource(selectedCity);
       videoRef.current.load();
       
       if (playVideo) {
@@ -262,7 +271,7 @@ const CitySelector = () => {
                   muted
                   playsInline
                 >
-                  <source src={selectedCity.video} type="video/mp4" />
+                  <source src={getVideoSource(selectedCity)} type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
 

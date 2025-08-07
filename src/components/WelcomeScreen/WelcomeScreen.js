@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ApiService from '../../services/api';
 import HeartColored from './HeartColored';
+import { getVideoBlob, storeVideoBlob } from '../../services/videoCache';
 
 const cityImages = [
   '/City/Bali H Small.png',
@@ -25,6 +26,12 @@ const WelcomeScreen = () => {
   const [progress, setProgress] = useState(0);
   const [animationCompleted, setAnimationCompleted] = useState(false);
   const [popupHearts, setPopupHearts] = useState([]);
+  // Flags to ensure prerequisites before starting heart animation
+  const [apiLoaded, setApiLoaded] = useState(false);
+  const [videosLoaded, setVideosLoaded] = useState(false);
+  // Tagline animation states
+  const [taglineOpacity, setTaglineOpacity] = useState(1);
+  const [currentTaglineText, setCurrentTaglineText] = useState("TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL.");
   const duration = 3000; // 3 seconds
   const loop = false;
   const MIN_DISTANCE = 100; // Prevent hearts within 100px radius of existing hearts
@@ -38,10 +45,67 @@ const WelcomeScreen = () => {
   // storing the response in both memory and localStorage so downstream components can
   // access it without additional network calls.
   useEffect(() => {
-    ApiService.getCountries().catch((err) => {
-      console.error('Failed to preload countries data:', err);
-    });
+    ApiService.getCountries()
+      .then(() => setApiLoaded(true))
+      .catch((err) => {
+        console.error('Failed to preload countries data:', err);
+        // Even if the API call fails, allow the animation to proceed
+        setApiLoaded(true);
+      });
   }, []);
+
+  // Preload city selection transition videos and cache in localStorage
+  useEffect(() => {
+    const cityVideos = [
+      { name: 'Bali', path: '/City/SelectionTransition/Bali.mp4' },
+      { name: 'Egypt', path: '/City/SelectionTransition/Egypt.mp4' },
+      { name: 'France', path: '/City/SelectionTransition/France.mp4' },
+      { name: 'Greece', path: '/City/SelectionTransition/Greece.mp4' },
+      { name: 'Japan', path: '/City/SelectionTransition/Japan.mp4' },
+      { name: 'Kenya', path: '/City/SelectionTransition/Kenya.mp4' },
+      { name: "L'Dweep", path: '/City/SelectionTransition/L\'Dweep.mp4' },
+      { name: 'Morocco', path: '/City/SelectionTransition/Morocco.mp4' },
+      { name: 'Spain', path: '/City/SelectionTransition/Spain.mp4' },
+      { name: 'Vietnam', path: '/City/SelectionTransition/Vietnam.mp4' },
+    ];
+
+    const preloadVideos = async () => {
+      const urlMap = {};
+      try {
+        await Promise.all(
+          cityVideos.map(async ({ name, path }) => {
+            let blob = await getVideoBlob(name);
+            if (!blob) {
+              const response = await fetch(path, { cache: 'force-cache' });
+              if (!response.ok) {
+                console.error('Failed to fetch video', name);
+                return;
+              }
+              blob = await response.blob();
+              await storeVideoBlob(name, blob);
+            }
+            // Create an in-memory object URL for immediate playback
+            urlMap[name] = URL.createObjectURL(blob);
+          })
+        );
+        if (typeof window !== 'undefined') {
+          window.cityVideoUrls = urlMap;
+        }
+      } catch (err) {
+        console.error('Error preloading videos:', err);
+      }
+      setVideosLoaded(true);
+    };
+
+    preloadVideos();
+  }, []);
+
+  // Start the heart fill animation only after data and videos are ready
+  useEffect(() => {
+    if (apiLoaded && videosLoaded && !isAnimating && !animationCompleted) {
+      startAnimation();
+    }
+  }, [apiLoaded, videosLoaded]);
 
   const handleNavigate = () => {
     navigate('/city-selection');
@@ -156,7 +220,8 @@ const WelcomeScreen = () => {
     if (!getColorAtViewport._canvas) {
       const c = document.createElement('canvas');
       getColorAtViewport._canvas = c;
-      getColorAtViewport._ctx = c.getContext('2d');
+      // Inform the browser that frequent readbacks will occur
+      getColorAtViewport._ctx = c.getContext('2d', { willReadFrequently: true });
     }
     const canvas = getColorAtViewport._canvas;
     const ctx = getColorAtViewport._ctx;
@@ -284,11 +349,31 @@ const WelcomeScreen = () => {
 
 
 
-  // Start main animation on mount
-  useEffect(() => {
-    setTimeout(startAnimation, 2000); // Start animation after 2 seconds
-  }, []);
 
+
+  // Tagline text fade animation effect
+  useEffect(() => {
+    const TAP_THRESHOLD = 0.4;
+    const shouldShowTapInstruction = progress >= TAP_THRESHOLD || animationCompleted;
+    const newText = shouldShowTapInstruction 
+      ? "TAP THE HEART TO EXPLORE PALLETTES FROM AROUND THE GLOBE"
+      : "TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL.";
+    
+    // Only animate if text actually changes
+    if (currentTaglineText !== newText) {
+      // Fade out
+      setTaglineOpacity(0);
+      
+      // After fade out completes, change text and fade in
+      setTimeout(() => {
+        setCurrentTaglineText(newText);
+        setTaglineOpacity(1);
+      }, 300); // 300ms fade out duration
+    }
+  }, [progress, animationCompleted, currentTaglineText]);
+
+  const TAP_THRESHOLD = 0.4; // show 2s before completion when duration is 3s
+  const showTapInstruction = progress >= TAP_THRESHOLD || animationCompleted;
   const clipPathValue = `inset(${100 - (progress * 100)}% 0 0 0)`;
 
   return (
@@ -340,11 +425,14 @@ const WelcomeScreen = () => {
 
         {/* Tagline Container - explicit z-index for clarity */}
         <div ref={taglineRef} className="absolute bottom-10 bg-white bg-opacity-70 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]">
-          <p className="text-black text-lg font-bold tracking-wider">
-            {animationCompleted 
-              ? "TAP THE HEART TO EXPLORE PALLETTES FROM AROUND THE GLOBE"
-              : "TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL."
-            }
+          <p 
+            className="text-black text-lg font-bold tracking-wider"
+            style={{
+              opacity: taglineOpacity,
+              transition: 'opacity 0.3s ease-in-out'
+            }}
+          >
+            {currentTaglineText}
           </p>
         </div>
       </div>
