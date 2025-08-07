@@ -36,4 +36,13 @@ body,
   .animate-carousel-drift {
     animation: carousel-drift 60s linear infinite;
   }
+
+  @keyframes heart-drift {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-6vw);
+    }
+  }
 }
