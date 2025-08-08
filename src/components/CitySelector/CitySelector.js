@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSpring, useTransition, animated } from 'react-spring';
+import { useSpring, useTransition, animated, easings } from '@react-spring/web';
 import { useNavigate } from 'react-router-dom';
 
 const cities = [
@@ -34,7 +34,7 @@ const CitySelector = () => {
     }
     return city.video;
   };
-  const [textAnimationTrigger, setTextAnimationTrigger] = useState(0); // Separate trigger for text animation
+  // Text/panel are controlled via a one-shot transition keyed by displayed city
   const itemWidth = typeof window !== 'undefined' ? (window.innerWidth / 4) : 375; // 1/4 of viewport width for 4 images
   const itemHeight = 180; // Reduced height to make images more rectangular (16:9 aspect ratio)
   const carouselRef = useRef(null);
@@ -133,7 +133,6 @@ const CitySelector = () => {
       // after slide-out completes, update displayed city and slide new one in
       setDisplayedCityIndex(nextDisplayIndex);
       setShowText(true);
-      setTextAnimationTrigger(prev => prev + 1); // Trigger text animation
     }, 800);
 
     // Step 4: After text animation completes (2.3s total), start video
@@ -178,24 +177,12 @@ const CitySelector = () => {
     immediate: true, // change instantly without interpolation
   });
 
-  // Animation for city text - slide-in / fade-out pattern
-  const textAnimation = useSpring({
-    from: showText ? { x: 500, opacity: 1 } : { x: 0, opacity: 1 },
-    to: showText ? { x: 0, opacity: 1 } : { x: 0, opacity: 0 },
-    reset: showText, // Reset animation when showing (to trigger slide-in)
-    key: textAnimationTrigger,
-    config: (key) => key === "x" ? { tension: 30, friction: 15 } : { tension: 280, friction: 30 },
-    immediate: (key) => showText ? key === "opacity" : key === "x", // When showing: don't animate opacity, When hiding: don't animate x
-  });
-
-  // Animation for the white panel - slide-in / fade-out pattern  
-  const panelAnimation = useSpring({
-    from: showText ? { x: -300, opacity: 1 } : { x: 0, opacity: 1 },
-    to: showText ? { x: 0, opacity: 1 } : { x: 0, opacity: 0 },
-    reset: showText, // Reset animation when showing (to trigger slide-in)
-    key: textAnimationTrigger,
-    config: (key) => key === "x" ? { tension: 30, friction: 15 } : { tension: 280, friction: 30 },
-    immediate: (key) => showText ? key === "opacity" : key === "x", // When showing: don't animate opacity, When hiding: don't animate x
+  // One-shot transition for text (from right) and panel (from left)
+  const textPanelTransitions = useTransition(displayedCityIndex, {
+    from: { textX: 450, panelX: -600, opacity: 1 },
+    enter: { textX: 0, panelX: 0, opacity: 1 },
+    // We unmount old content instantly via showText gate
+    config: { duration: 1200, easing: easings.easeInOutCubic },
   });
 
   return (
@@ -275,60 +262,72 @@ const CitySelector = () => {
                   Your browser does not support the video tag.
                 </video>
 
-                /* Animated City Text */
-                        <animated.div
-                          onClick={handleCityClick}
-                          style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: textAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                          opacity: textAnimation.opacity,
-                          pointerEvents: 'auto',
-                          }}
-                          className="cursor-pointer text-white flex flex-col items-center justify-center"
-                        >
-                          {/* Animated white panel behind text */}
-                          <animated.div
-                            style={{
-                              position: 'absolute',
-                              top: '50%',
-                              left: '50%',
-                              transform: panelAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                              opacity: panelAnimation.opacity.to((val) => val * 0.8), // Apply base opacity of 0.8 to the animated value
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '4px',
-                              padding: '20px 80px',
-                              minWidth: '700px',
-                              minHeight: '150px',
-                              zIndex: -1,
-                              pointerEvents: 'none',
-                            }}
-                            className="backdrop-blur-sm"
-                          />
-                          <animated.div
-                            style={{
-                              position: 'absolute',
-                              top: '50%',
-                              left: '50%',
-                              transform: panelAnimation.x.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
-                              opacity: panelAnimation.opacity.to((val) => val * 0.4), // Apply base opacity of 0.4 to the animated value
-                              backgroundColor: 'rgba(255, 255, 255, 0.4)',
-                              borderRadius: '4px',
-                              padding: '20px 80px',
-                              minWidth: '700px',
-                              minHeight: '170px',
-                              zIndex: -2,
-                              pointerEvents: 'none',
-                            }}
-                            className="backdrop-blur-sm"
-                          />
-                          
-                          <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:"100px" }}>
-                          {displayedCity.name.toUpperCase()}
-                          </h1>
-                          <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem' }}>EXPLORE</p>
-                        </animated.div>
+                {showText && textPanelTransitions((styles, item) => (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {/* Panels group (slides in from left) */}
+                    <animated.div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: styles.panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                        opacity: styles.opacity.to((val) => val * 0.8),
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        borderRadius: '4px',
+                        padding: '20px 80px',
+                        minWidth: '700px',
+                        minHeight: '150px',
+                        zIndex: -1,
+                        pointerEvents: 'none',
+                      }}
+                      className="backdrop-blur-sm"
+                    />
+                    <animated.div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: styles.panelX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                        opacity: styles.opacity.to((val) => val * 0.4),
+                        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                        borderRadius: '4px',
+                        padding: '20px 80px',
+                        minWidth: '700px',
+                        minHeight: '170px',
+                        zIndex: -2,
+                        pointerEvents: 'none',
+                      }}
+                      className="backdrop-blur-sm"
+                    />
+
+                    {/* Text group (slides in from right) */}
+                    <animated.div
+                      onClick={handleCityClick}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: styles.textX.to((val) => `translate(-50%, -50%) translateX(${val}px)`),
+                        opacity: styles.opacity,
+                        pointerEvents: 'auto',
+                      }}
+                      className="cursor-pointer text-white flex flex-col items-center justify-center"
+                    >
+                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:'100px' }}>
+                        {cities[item].name.toUpperCase()}
+                      </h1>
+                      <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem' }}>EXPLORE</p>
+                    </animated.div>
+                  </div>
+                ))}
 
                         {/* Heart outline overlay for better definition */}
                 <div
