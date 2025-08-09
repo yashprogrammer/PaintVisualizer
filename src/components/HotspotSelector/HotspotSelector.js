@@ -168,11 +168,14 @@ const HotspotSelector = () => {
 
       {/* Instructions */}
       <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="bg-black bg-opacity-70 text-white px-8 py-4 rounded-lg backdrop-blur-sm">
-          <p className="text-lg font-medium tracking-wide text-center font-brand">
+        <div 
+          className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
+        >
+         <p className="text-black text-xl font-bold tracking-widest text-center font-brand">
             TAP A PAINT TONE HOTSPOT TO CONTINUE
           </p>
-        </div>
+        </div> 
       </div>
 
       {/* Back Button */}
@@ -186,18 +189,7 @@ const HotspotSelector = () => {
         </button>
       </div>
 
-      {/* City Name Display */}
-      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="bg-black bg-opacity-70 text-white px-6 py-2 rounded-lg backdrop-blur-sm">
-          <span className="text-lg font-semibold tracking-wider font-brand">
-            {cityData.name.toUpperCase()}
-          </span>
-          {/* Data source indicator */}
-          <div className="text-xs mt-1 opacity-70">
-            {usingApiData ? '🌐 API Data' : '📁 Static Data'}
-          </div>
-        </div>
-      </div>
+     
     </div>
   );
 };
