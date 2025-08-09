@@ -43,7 +43,7 @@ const Visualizer = ({
               const isSelected = selectedSurface === surface.id;
               const surfaceColor = surfaceColors[surface.id];
 
-              // Skip rendering if not selected and no colour applied yet
+              // Skip rendering entirely if not selected and no colour applied
               if (!isSelected && !surfaceColor) return null;
 
               const baseMaskStyles = {
@@ -56,51 +56,50 @@ const Visualizer = ({
                 maskPosition: 'center',
                 WebkitMaskPosition: 'center',
                 pointerEvents: 'none',
-                // Hide overlay if mask hasn't loaded to prevent full-image coloring
                 display: maskLoaded ? 'block' : 'none',
                 transition: 'opacity 0.2s ease',
                 borderRadius: 'inherit',
               };
 
-              const colorOverlayStyles = {
-                ...baseMaskStyles,
-                backgroundColor: surfaceColor ? surfaceColor : 'rgba(0,0,0,0.001)',
-                mixBlendMode: surfaceColor ? 'multiply' : 'normal',
-                zIndex: isSelected ? 90 : idx + 1,
-                opacity: isSelected ? 1 : 0.8,
-              };
+              const layers = [];
 
-              if (!isSelected) {
-                return (
+              // 1) Paint colour layer only if the surface actually has a colour
+              if (surfaceColor) {
+                const colorOverlayStyles = {
+                  ...baseMaskStyles,
+                  backgroundColor: surfaceColor,
+                  mixBlendMode: 'multiply',
+                  zIndex: isSelected ? 90 : idx + 1,
+                  opacity: 1,
+                };
+                layers.push(
                   <div
-                    key={surface.id}
+                    key={`${surface.id}-color`}
                     className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl`}
                     style={colorOverlayStyles}
                   />
                 );
               }
 
-              // For selected surface, render both the colour overlay and a dedicated outline overlay
-              const outlineStyles = {
-                ...baseMaskStyles,
-                backgroundColor: 'rgba(0,0,0,0.01)', // minimal alpha to allow drop-shadows to compute
-                mixBlendMode: 'normal',
-                zIndex: 1000,
-                opacity: 1,
-              };
-
-              return (
-                <React.Fragment key={surface.id}>
+              // 2) Red outline layer only when selected; no fill at all
+              if (isSelected) {
+                const outlineStyles = {
+                  ...baseMaskStyles,
+                  backgroundColor: 'transparent', // no fill, just outline via filter
+                  mixBlendMode: 'normal',
+                  zIndex: 1000,
+                  opacity: 1,
+                };
+                layers.push(
                   <div
-                    className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl`}
-                    style={colorOverlayStyles}
-                  />
-                  <div
+                    key={`${surface.id}-outline`}
                     className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl selected-outline`}
                     style={outlineStyles}
                   />
-                </React.Fragment>
-              );
+                );
+              }
+
+              return <React.Fragment key={surface.id}>{layers}</React.Fragment>;
             })}
             
             {/* Loading indicator */}
