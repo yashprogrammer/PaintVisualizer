@@ -117,8 +117,8 @@ const Visualizer = ({
               if (isFilled) {
                 const details = colorInfo?.[color?.toUpperCase()] || {};
                 return (
-                  <div key={index} className="flex flex-col items-center gap-1 swatch-item">
-                    <div className="relative swatch-container">
+                  <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
+                    <div className="relative swatch-container overflow-visible">
                       <div
                         className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
                         style={{ backgroundColor: color }}
@@ -154,7 +154,7 @@ const Visualizer = ({
  
               // Placeholder swatch
               return (
-                <div key={index} className="flex flex-col items-center gap-1 swatch-item">
+                <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
                   <div className={`${commonClasses} bg-gray-200`} />
                   <span className="text-xs">&nbsp;</span>
                 </div>
