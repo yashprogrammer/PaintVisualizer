@@ -46,8 +46,7 @@ const Visualizer = ({
               // Skip rendering if not selected and no colour applied yet
               if (!isSelected && !surfaceColor) return null;
 
-              const styleObj = {
-                backgroundColor: surfaceColor ? surfaceColor : 'rgba(0,0,0,0.001)', // nearly transparent if no colour, just for shape
+              const baseMaskStyles = {
                 maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
                 WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
                 maskSize: 'cover',
@@ -56,24 +55,51 @@ const Visualizer = ({
                 WebkitMaskRepeat: 'no-repeat',
                 maskPosition: 'center',
                 WebkitMaskPosition: 'center',
-                mixBlendMode: surfaceColor ? 'multiply' : 'normal',
-                zIndex: isSelected ? 100 : idx + 1,
                 pointerEvents: 'none',
                 // Hide overlay if mask hasn't loaded to prevent full-image coloring
                 display: maskLoaded ? 'block' : 'none',
                 transition: 'opacity 0.2s ease',
+                borderRadius: 'inherit',
               };
 
-              if (isSelected) {
-                styleObj.filter = 'drop-shadow(0 0 3px rgba(255,0,0,0.9)) drop-shadow(0 0 3px rgba(255,0,0,0.9))';
+              const colorOverlayStyles = {
+                ...baseMaskStyles,
+                backgroundColor: surfaceColor ? surfaceColor : 'rgba(0,0,0,0.001)',
+                mixBlendMode: surfaceColor ? 'multiply' : 'normal',
+                zIndex: isSelected ? 90 : idx + 1,
+                opacity: isSelected ? 1 : 0.8,
+              };
+
+              if (!isSelected) {
+                return (
+                  <div
+                    key={surface.id}
+                    className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl`}
+                    style={colorOverlayStyles}
+                  />
+                );
               }
 
+              // For selected surface, render both the colour overlay and a dedicated outline overlay
+              const outlineStyles = {
+                ...baseMaskStyles,
+                backgroundColor: 'rgba(0,0,0,0.01)', // minimal alpha to allow drop-shadows to compute
+                mixBlendMode: 'normal',
+                zIndex: 1000,
+                opacity: 1,
+              };
+
               return (
-                <div
-                  key={surface.id}
-                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl ${isSelected ? 'opacity-100' : 'opacity-80'}`}
-                  style={styleObj}
-                />
+                <React.Fragment key={surface.id}>
+                  <div
+                    className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl`}
+                    style={colorOverlayStyles}
+                  />
+                  <div
+                    className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl selected-outline`}
+                    style={outlineStyles}
+                  />
+                </React.Fragment>
               );
             })}
             

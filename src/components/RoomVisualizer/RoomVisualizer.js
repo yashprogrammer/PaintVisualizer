@@ -472,6 +472,15 @@ const RoomVisualizer = () => {
         .surface-selected {
           filter: brightness(1.1) saturate(1.2);
         }
+
+        /* Neon pink outline for selected surface (mask-based) */
+        .selected-outline {
+          filter:
+            drop-shadow(0 0 0 rgba(255, 51, 102, 0.0)) /* base no offset to keep inside */
+            drop-shadow(0 0 2px rgba(255, 51, 102, 0.9))
+            drop-shadow(0 0 6px rgba(255, 51, 102, 0.8))
+            drop-shadow(0 0 10px rgba(255, 51, 102, 0.7));
+        }
         
         /* Responsive adjustments */
          @media (max-width: 1024px) {
