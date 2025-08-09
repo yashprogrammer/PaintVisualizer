@@ -19,12 +19,14 @@ const CitySelector = () => {
   const navigate = useNavigate();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [displayedCityIndex, setDisplayedCityIndex] = useState(0); // controls the city name shown in text
-  const [currentPosition, setCurrentPosition] = useState(0);
+  // Virtual index over an extended array with cloned edges for seamless loop
+  const [virtualIndex, setVirtualIndex] = useState(1);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHeart, setShowHeart] = useState(true);
   const [showText, setShowText] = useState(true);
   const [playVideo, setPlayVideo] = useState(true);
   const [animationKey, setAnimationKey] = useState(0); // Add animation key state
+  const [instantJump, setInstantJump] = useState(false); // disable CSS transition for index corrections
 
   // Retrieve preloaded video from localStorage if available
   const getVideoSource = (city) => {
@@ -40,15 +42,13 @@ const CitySelector = () => {
   const carouselRef = useRef(null);
   const videoRef = useRef(null);
   
-  // Create a smaller multiplier so repeats are visible
-  const multiplier = 5; // Reduced so you can see repetitions
-  const infiniteCities = Array(multiplier).fill(cities).flat();
-  const startIndex = Math.floor(multiplier / 2) * cities.length;
+  // Build an extended list with clones for infinite scroll illusion
+  const extendedCities = [cities[cities.length - 1], ...cities, cities[0]];
 
   // Initialize position to center
   useEffect(() => {
-    setCurrentPosition(startIndex);
-  }, [startIndex]);
+    setVirtualIndex(1); // start on first real slide
+  }, []);
 
   // Update video source when selected city changes
   useEffect(() => {
@@ -83,34 +83,25 @@ const CitySelector = () => {
 
   const handlePrev = () => {
     if (isTransitioning) return;
-    const newIndex = selectedIndex === 0 ? cities.length - 1 : selectedIndex - 1;
-    startAnimationSequence(newIndex);
-    
-    setCurrentPosition(prev => {
-      const newPos = prev - 1;
-      // If we go below 0, wrap to the end
-      return newPos < 0 ? infiniteCities.length - 1 : newPos;
-    });
-    
-    setSelectedIndex(newIndex);
+    // Compute the upcoming selection and kick off the heart/text animation now
+    const nextIndex = selectedIndex === 0 ? cities.length - 1 : selectedIndex - 1;
+    startAnimationSequence(nextIndex);
+    // Begin slide: lock input and move left by one item
+    setIsTransitioning(true);
+    setVirtualIndex(prev => prev - 1);
   };
 
   const handleNext = () => {
     if (isTransitioning) return;
-    const newIndex = selectedIndex === cities.length - 1 ? 0 : selectedIndex + 1;
-    startAnimationSequence(newIndex);
-    
-    setCurrentPosition(prev => {
-      const newPos = prev + 1;
-      // If we go beyond the array, wrap to the beginning
-      return newPos >= infiniteCities.length ? 0 : newPos;
-    });
-    
-    setSelectedIndex(newIndex);
+    // Compute the upcoming selection and kick off the heart/text animation now
+    const nextIndex = selectedIndex === cities.length - 1 ? 0 : selectedIndex + 1;
+    startAnimationSequence(nextIndex);
+    // Begin slide: lock input and move right by one item
+    setIsTransitioning(true);
+    setVirtualIndex(prev => prev + 1);
   };
 
   const startAnimationSequence = (nextDisplayIndex) => {
-    setIsTransitioning(true);
     setShowHeart(false);
     setShowText(false);
     setPlayVideo(false);
@@ -138,7 +129,6 @@ const CitySelector = () => {
     // Step 4: After text animation completes (2.3s total), start video
     setTimeout(() => {
       setPlayVideo(true);
-      setIsTransitioning(false);
       // Don't increment textAnimationTrigger here - we want text to stay in place
     }, 2300);
   };
@@ -151,7 +141,7 @@ const CitySelector = () => {
 
   // Calculate translateX based on current position
   const centerOffset = typeof window !== 'undefined' ? (window.innerWidth / 2) - (itemWidth / 2) : 0;
-  const translateX = centerOffset - (currentPosition * itemWidth);
+  const translateX = centerOffset - (virtualIndex * itemWidth);
 
   const selectedCity = cities[selectedIndex];
   const displayedCity = cities[displayedCityIndex];
@@ -173,8 +163,8 @@ const CitySelector = () => {
 
   // Heart visibility (no fade animation, updates instantly)
   const heartAnimation = useSpring({
-    opacity: showHeart ? 1 : 1,
-    immediate: true, // change instantly without interpolation
+    opacity: showHeart ? 1 : 0,
+    config: { duration: 300 },
   });
 
   // One-shot transition for text (from right) and panel (from left)
@@ -345,7 +335,7 @@ const CitySelector = () => {
 
             {/* Carousel container */}
             <div
-              className="relative w-full flex justify-center items-center overflow-hidden"
+              className="relative w-full flex items-center overflow-hidden"
               // This style creates a border that is white and thickest at the center, fading out towards the edges.
               style={{
                 /* Create a white border that is thickest at the centre and fades towards the edges */
@@ -355,6 +345,7 @@ const CitySelector = () => {
                 //    The '1' at the end is the border image slice value, which means the gradient is stretched to fill the border area.
                 border: '4px solid transparent',
                 borderImage: 'linear-gradient(to right, rgba(255,255,255,0.2) 0%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%) 1',
+                height: `${itemHeight}px`,
               }}
             >
               {/* Navigation buttons */}
@@ -379,26 +370,46 @@ const CitySelector = () => {
               {/* Carousel items */}
               <div 
                 ref={carouselRef}
-                className={`flex ${isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''}`}
+                onTransitionEnd={() => {
+                  // Sync selectedIndex to the slide that stopped under the heart
+                  const realIndex = (virtualIndex - 1 + cities.length) % cities.length;
+                  setSelectedIndex(realIndex);
+                  setDisplayedCityIndex(realIndex);
+
+                  // When we hit cloned slides, jump instantly to the corresponding real slide
+                  if (virtualIndex === extendedCities.length - 1) {
+                    setInstantJump(true);
+                    setVirtualIndex(1);
+                    requestAnimationFrame(() => setInstantJump(false));
+                  } else if (virtualIndex === 0) {
+                    setInstantJump(true);
+                    setVirtualIndex(extendedCities.length - 2);
+                    requestAnimationFrame(() => setInstantJump(false));
+                  }
+
+                  // Sliding finished (let heart/text sequence control final state)
+                  setTimeout(() => setIsTransitioning(false), 0);
+                }}
+                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''}`}
                 style={{
                   transform: `translateX(${translateX}px)`,
-                  width: `${infiniteCities.length * itemWidth}px`,
+                  width: `${extendedCities.length * itemWidth}px`,
                 }}
               >
-                {infiniteCities.map((city, index) => {
+                {extendedCities.map((city, index) => {
                   // Calculate which city this represents in our original array
-                  const cityIndex = index % cities.length;
+                  const cityIndex = (index - 1 + cities.length) % cities.length; // map extended indices to base
                   
                   // Check if this is the currently selected item (in center)
-                  const isSelected = index === currentPosition;
+                  const isSelected = index === virtualIndex;
                   
                   return (
                     <div
                       key={`${city.name}-${index}`}
-                      className="flex-shrink-0s"
+                      className="flex-none"
                       style={{ 
                         width: `${itemWidth}px`,
-                        height: `${itemHeight}px`,
+                        height: '100%',
                         border: '1px solid transparent',
                         borderImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%) 1',
                         // Removed padding to eliminate gaps between images
