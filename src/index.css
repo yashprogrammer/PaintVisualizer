@@ -2,10 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour Sans (brand).
+   If the font is installed on the system it will be used via local().
+   To host it with the app, place webfont files under `public/fonts/` and
+   add additional sources here. */
+@font-face {
+  font-family: "Colour Sans";
+  src: local("Colour Sans Light"), local("Colour Sans");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Colour Sans";
+  src: local("Colour Sans Bold"), local("Colour Sans");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
   background-color: transparent;
+}
+
+/* Global typography defaults per brand guideline */
+@layer base {
+  html {
+    font-family: theme("fontFamily.sans");
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: theme("fontFamily.brand");
+    font-weight: 700; /* Use Colour Sans Bold for headings */
+  }
+  .text-contrast {
+    font-family: theme("fontFamily.brand");
+    font-weight: 300; /* Colour Sans Light for secondary lines */
+  }
+}
+
+@layer components {
+  .title-text { @apply font-brand; }
+  .vibrant-text { @apply font-brand; }
+  .surface-text { @apply font-brand; }
 }
 
 @layer utilities {

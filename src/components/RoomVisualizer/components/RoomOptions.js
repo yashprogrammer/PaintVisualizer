@@ -4,7 +4,7 @@ import { roomData } from '../../../data/roomData';
 const RoomOptions = ({ currentRoom, selectRoom }) => {
   return (
     <div className="column-3 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px]  w-1/4 flex-shrink-0">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-right w-full">
+     <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-right w-full font-brand">
         <p className="block leading-normal">Select Room</p>
       </div>
       <div className="container-height flex flex-col flex-1 items-start justify-start p-3 lg:p-[16px] rounded-2xl lg:rounded-3xl border-[3px] lg:border-[5px] border-solid border-[#d2d2d2] w-full h-full min-h-0">
@@ -25,7 +25,7 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                  <span className="text-white text-xs font-medium">
+                 <span className="text-white text-xs font-medium font-brand">
                     {room.name}
                   </span>
                 </div>

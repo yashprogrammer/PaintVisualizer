@@ -94,7 +94,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
 
   return (
     <div className="column-1 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px] w-1/4 flex-shrink-0">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-left w-full">
+      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-left w-full font-brand">
         <p className="block leading-normal">Color Lock UP</p>
       </div>
       <div className="container-height flex-1 relative rounded-2xl lg:rounded-3xl w-full border-[3px] lg:border-[5px] border-solid border-[#d2d2d2]">
@@ -108,7 +108,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             >
               {renderPaletteSvg(1, 'Cool Palette')}
             </div>
-            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap">
+            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap font-brand">
               <p className="block leading-normal whitespace-pre">Vibrant</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             >
               {renderPaletteSvg(2, 'Vibrant Palette')}
             </div>
-            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap">
+            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap font-brand">
               <p className="block leading-normal whitespace-pre">Cool</p>
             </div>
           </div>

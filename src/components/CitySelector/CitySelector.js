@@ -324,7 +324,7 @@ const CitySelector = () => {
                       <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:'100px', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
                         {cities[item].name.toUpperCase()}
                       </h1>
-                      <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
+                     <p className="font-light tracking-[0.3em] select-none text-gray-800 font-brand" style={{ fontSize: '2rem', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
                     </animated.div>
                   </div>
                 ))}
@@ -458,7 +458,7 @@ const CitySelector = () => {
             className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
           >
-            <p className="text-black text-xl font-bold tracking-widest text-center">
+           <p className="text-black text-xl font-bold tracking-widest text-center font-brand">
               CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
             </p>
           </div> 

@@ -18,7 +18,7 @@ const Visualizer = ({
 }) => {
   return (
     <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden px-4 lg:px-[25px]  w-1/2 flex-shrink-0">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-center w-full">
+      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-center w-full font-brand">
         <p className="block leading-normal">Visualizer</p>
       </div>
       <div className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-2xl lg:rounded-3xl w-full border-[3px] lg:border-[5px] border-solid border-[#d2d2d2]">
@@ -80,7 +80,7 @@ const Visualizer = ({
             {/* Loading indicator */}
             {!isMasksLoaded && (
               <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center rounded-2xl lg:rounded-3xl">
-                <div className="bg-white px-4 py-2 rounded-lg text-sm font-medium">
+                <div className="bg-white px-4 py-2 rounded-lg text-sm font-medium font-brand">
                   Loading masks...
                 </div>
               </div>
@@ -88,7 +88,7 @@ const Visualizer = ({
             
             {/* Selection indicator */}
             {selectedSurface && (
-              <div className="absolute top-6 left-6 bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium">
+              <div className="absolute top-6 left-6 bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium font-brand">
                 {roomData[currentRoom].surfaces.find(s => s.id === selectedSurface)?.name || selectedSurface}
               </div>
             )}
@@ -101,7 +101,7 @@ const Visualizer = ({
               </div>
             )}
           </div>
-          <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center">
+          <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand">
             <p className="block leading-normal">Select surface to paint</p>
           </div>
         </div>
