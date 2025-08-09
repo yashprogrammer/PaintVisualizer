@@ -283,7 +283,7 @@ const CitySelector = () => {
                         backgroundColor: 'rgba(255, 255, 255, 0.8)',
                         borderRadius: '4px',
                         padding: '20px 80px',
-                        minWidth: '700px',
+                        minWidth: '800px',
                         minHeight: '150px',
                         zIndex: -1,
                         pointerEvents: 'none',
@@ -300,7 +300,7 @@ const CitySelector = () => {
                         backgroundColor: 'rgba(255, 255, 255, 0.4)',
                         borderRadius: '4px',
                         padding: '20px 80px',
-                        minWidth: '700px',
+                        minWidth: '800px',
                         minHeight: '170px',
                         zIndex: -2,
                         pointerEvents: 'none',
@@ -321,10 +321,10 @@ const CitySelector = () => {
                       }}
                       className="cursor-pointer text-white flex flex-col items-center justify-center"
                     >
-                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:'100px' }}>
+                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:'100px', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
                         {cities[item].name.toUpperCase()}
                       </h1>
-                      <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem' }}>EXPLORE</p>
+                      <p className="font-light tracking-[0.3em] select-none text-gray-800" style={{ fontSize: '2rem', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
                     </animated.div>
                   </div>
                 ))}
@@ -454,11 +454,14 @@ const CitySelector = () => {
 
         {/* Instruction text with glass panel background */}
         <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="bg-white bg-opacity-20 backdrop-blur-md rounded-lg px-8 py-4 border border-white border-opacity-30 shadow-lg">
-            <p className="text-white text-sm tracking-widest text-center" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.5)' }}>
+          <div 
+            className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
+          >
+            <p className="text-black text-xl font-bold tracking-widest text-center">
               CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
             </p>
-          </div>
+          </div> 
         </div>
       </div>
     </div>

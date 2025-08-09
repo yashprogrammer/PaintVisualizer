@@ -424,7 +424,14 @@ const WelcomeScreen = () => {
         </div>
 
         {/* Tagline Container - explicit z-index for clarity */}
-        <div ref={taglineRef} className="absolute bottom-10 bg-white bg-opacity-70 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]">
+        <div 
+          ref={taglineRef} 
+          className="absolute bottom-10 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.65)',
+            border: '2px solid rgba(255, 255, 255, 1.0)'
+          }}
+        >
           <p 
             className="text-black text-lg font-bold tracking-wider"
             style={{
