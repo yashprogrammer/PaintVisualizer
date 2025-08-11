@@ -93,13 +93,8 @@ const Visualizer = ({
               </div>
             )}
             
-            {/* Debug info (remove in production) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
-                Masks loaded: {isMasksLoaded ? 'Yes' : 'No'} | 
-                Count: {Object.keys(maskImagesRef.current).length}
-              </div>
-            )}
+      
+         
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand">
             <p className="block leading-normal">Select surface to paint</p>

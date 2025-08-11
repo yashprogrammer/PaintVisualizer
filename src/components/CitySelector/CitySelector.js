@@ -50,25 +50,9 @@ const CitySelector = () => {
     setVirtualIndex(2); // start on Egypt (second real slide)
   }, []);
 
-  // Update video source when selected city changes
-  useEffect(() => {
-    if (videoRef.current) {
-      const selectedCity = cities[selectedIndex];
-      videoRef.current.src = getVideoSource(selectedCity);
-      videoRef.current.load();
-      
-      if (playVideo) {
-        // Only play if playVideo is true
-        videoRef.current.play().catch(error => {
-          console.log('Auto-play failed:', error);
-        });
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [selectedIndex]);
+  // (Video src is controlled by transition rendering; no imperative src swap)
 
-  // Handle video play/pause when playVideo state changes
+  // Handle video play/pause for the currently active video
   useEffect(() => {
     if (videoRef.current) {
       if (playVideo) {
@@ -79,7 +63,7 @@ const CitySelector = () => {
         videoRef.current.pause();
       }
     }
-  }, [playVideo]);
+  }, [playVideo, selectedIndex]);
 
   const handlePrev = () => {
     if (isTransitioning) return;
@@ -126,11 +110,11 @@ const CitySelector = () => {
       setShowText(true);
     }, 800);
 
-    // Step 4: After text animation completes (2.3s total), start video
+    // Step 4: Start video earlier (1.8s into sequence; 500ms earlier)
     setTimeout(() => {
       setPlayVideo(true);
       // Don't increment textAnimationTrigger here - we want text to stay in place
-    }, 2300);
+    }, 800);
   };
 
   const handleCityClick = () => {
@@ -163,7 +147,7 @@ const CitySelector = () => {
 
   // Heart visibility (no fade animation, updates instantly)
   const heartAnimation = useSpring({
-    opacity: showHeart ? 1 : 0,
+    opacity: showHeart ? 1 : 1,
     config: { duration: 300 },
   });
 
@@ -173,6 +157,14 @@ const CitySelector = () => {
     enter: { textX: 0, panelX: 0, opacity: 1 },
     // We unmount old content instantly via showText gate
     config: { duration: 1200, easing: easings.easeInOutCubic },
+  });
+
+  // Cross-fade transition for heart-masked videos when city changes
+  const videoTransitions = useTransition(selectedIndex, {
+    from: { opacity: 0 },
+    enter: { opacity: 1 },
+    leave: { opacity: 0 },
+    config: { duration: 700, easing: easings.easeInOutCubic },
   });
 
   return (
@@ -240,17 +232,25 @@ const CitySelector = () => {
                   maskPosition: 'center',
                 }}
               >
-                {/* Video background */}
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-contain pointer-events-none"
-                  autoPlay
-                  muted
-                  playsInline
-                >
-                  <source src={getVideoSource(selectedCity)} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
+                {/* Video background crossfading between cities */}
+                {videoTransitions((styles, item) => {
+                  const cityForVideo = cities[item];
+                  return (
+                    <animated.video
+                      key={item}
+                      ref={selectedIndex === item ? videoRef : null}
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      style={{ opacity: styles.opacity }}
+                      autoPlay
+                      muted
+                      playsInline
+                      preload="auto"
+                    >
+                      <source src={getVideoSource(cityForVideo)} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </animated.video>
+                  );
+                })}
 
                 {showText && textPanelTransitions((styles, item) => (
                   <div
@@ -469,7 +469,7 @@ const CitySelector = () => {
             className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
           >
-           <p className="text-black text-xl font-bold tracking-widest text-center font-brand">
+           <p className="text-black text-xl font-bold tracking-widest text-center font-brand whitespace-nowrap">
               CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
             </p>
           </div> 
