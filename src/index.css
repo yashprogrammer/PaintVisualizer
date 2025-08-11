@@ -86,4 +86,61 @@ body,
       transform: translateX(-6vw);
     }
   }
+
+  /* Heart beat emphasis for CTA */
+  @keyframes heart-beat {
+    0%, 100% {
+      transform: scale(1);
+    }
+    14% {
+      transform: scale(1.18);
+    }
+    28% {
+      transform: scale(1);
+    }
+    42% {
+      transform: scale(1.12);
+    }
+    70% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-heartbeat {
+    animation: heart-beat 1.1s ease-in-out infinite;
+    will-change: transform;
+    transform-origin: center center;
+  }
+
+  /* Centered variant that keeps the element translated to its center while scaling */
+  @keyframes heart-beat-centered {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    14% {
+      transform: translate(-50%, -55%) scale(1.12);
+    }
+    28% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    42% {
+      transform: translate(-50%, -53%) scale(1.08);
+    }
+    70% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  .heartbeat-overlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    animation: heart-beat-centered 1.1s ease-in-out infinite;
+    will-change: transform;
+    pointer-events: none;
+  }
 }
