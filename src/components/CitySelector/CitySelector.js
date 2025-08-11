@@ -17,10 +17,10 @@ const cities = [
 
 const CitySelector = () => {
   const navigate = useNavigate();
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [displayedCityIndex, setDisplayedCityIndex] = useState(0); // controls the city name shown in text
+  const [selectedIndex, setSelectedIndex] = useState(1);
+  const [displayedCityIndex, setDisplayedCityIndex] = useState(1); // controls the city name shown in text
   // Virtual index over an extended array with cloned edges for seamless loop
-  const [virtualIndex, setVirtualIndex] = useState(1);
+  const [virtualIndex, setVirtualIndex] = useState(2);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHeart, setShowHeart] = useState(true);
   const [showText, setShowText] = useState(true);
@@ -47,7 +47,7 @@ const CitySelector = () => {
 
   // Initialize position to center
   useEffect(() => {
-    setVirtualIndex(1); // start on first real slide
+    setVirtualIndex(2); // start on Egypt (second real slide)
   }, []);
 
   // Update video source when selected city changes

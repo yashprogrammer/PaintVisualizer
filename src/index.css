@@ -93,13 +93,13 @@ body,
       transform: scale(1);
     }
     14% {
-      transform: scale(1.18);
+      transform: scale(1.12);
     }
     28% {
       transform: scale(1);
     }
     42% {
-      transform: scale(1.12);
+      transform: scale(1.08);
     }
     70% {
       transform: scale(1);
@@ -118,13 +118,13 @@ body,
       transform: translate(-50%, -50%) scale(1);
     }
     14% {
-      transform: translate(-50%, -55%) scale(1.12);
+      transform: translate(-50%, -52%) scale(1.07);
     }
     28% {
       transform: translate(-50%, -50%) scale(1);
     }
     42% {
-      transform: translate(-50%, -53%) scale(1.08);
+      transform: translate(-50%, -51%) scale(1.04);
     }
     70% {
       transform: translate(-50%, -50%) scale(1);
