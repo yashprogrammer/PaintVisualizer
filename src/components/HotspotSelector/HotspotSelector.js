@@ -10,6 +10,7 @@ const HotspotSelector = () => {
   const [error, setError] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [usingApiData, setUsingApiData] = useState(true); // Always using API data now
+  const [filteredHotspots, setFilteredHotspots] = useState([]);
 
   useEffect(() => {
     const fetchCityData = async () => {
@@ -57,6 +58,61 @@ const HotspotSelector = () => {
     fetchCityData();
   }, [city]);
 
+  // Compute a filtered list of hotspots where overlapping points are deduplicated
+  useEffect(() => {
+    if (!cityData?.hotspots || cityData.hotspots.length === 0) {
+      setFilteredHotspots([]);
+      return;
+    }
+
+    const computeFiltered = () => {
+      const hasWindow = typeof window !== 'undefined';
+      const viewportWidth = hasWindow ? window.innerWidth : 1920;
+      const viewportHeight = hasWindow ? window.innerHeight : 1080;
+
+      // Approximate visual diameter of hotspot circle including border
+      const HOTSPOT_DIAMETER_PX = 40;
+      const PROXIMITY_PX = HOTSPOT_DIAMETER_PX * 0.8; // hide if centers are closer than this
+
+      const toPx = (value, total) => {
+        if (typeof value === 'number') return value; // assume already px
+        if (typeof value === 'string') {
+          const num = parseFloat(value);
+          if (Number.isNaN(num)) return 0;
+          return value.includes('%') ? (num / 100) * total : num;
+        }
+        return 0;
+      };
+
+      const result = [];
+      cityData.hotspots.forEach((hotspot) => {
+        const xPx = toPx(hotspot.x, viewportWidth);
+        const yPx = toPx(hotspot.y, viewportHeight);
+
+        const overlaps = result.some((kept) => {
+          const keptXPx = toPx(kept.x, viewportWidth);
+          const keptYPx = toPx(kept.y, viewportHeight);
+          const dx = xPx - keptXPx;
+          const dy = yPx - keptYPx;
+          return Math.hypot(dx, dy) < PROXIMITY_PX;
+        });
+
+        if (!overlaps) {
+          result.push(hotspot);
+        }
+      });
+
+      setFilteredHotspots(result);
+    };
+
+    computeFiltered();
+
+    // Recompute on resize so proximity in pixels stays accurate
+    const onResize = () => computeFiltered();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [cityData]);
+
   const handleHotspotClick = (hotspot) => {
     if (!cityData || !hotspot) return;
     
@@ -100,6 +156,10 @@ const HotspotSelector = () => {
 
   if (!cityData) return null;
 
+  const hotspotsToRender = (filteredHotspots && filteredHotspots.length > 0)
+    ? filteredHotspots
+    : (cityData.hotspots || []);
+
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden">
       {/* Background Image */}
@@ -125,7 +185,7 @@ const HotspotSelector = () => {
       
 
       {/* Hotspots */}
-      {cityData.hotspots.map((hotspot) => (
+      {hotspotsToRender.map((hotspot) => (
         <button
           key={hotspot.id}
           onClick={() => handleHotspotClick(hotspot)}

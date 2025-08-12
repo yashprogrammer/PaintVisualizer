@@ -375,6 +375,8 @@ const WelcomeScreen = () => {
   const TAP_THRESHOLD = 0.4; // show 2s before completion when duration is 3s
   const showTapInstruction = progress >= TAP_THRESHOLD || animationCompleted;
   const clipPathValue = `inset(${100 - (progress * 100)}% 0 0 0)`;
+  const BEEP_START_LEAD_MS = 1450; // start heartbeat 1000ms (1s) before fill completes
+  const showBeepingOverlay = animationCompleted || (progress >= Math.max(0, 1 - BEEP_START_LEAD_MS / duration));
 
   return (
     <div className="h-screen w-screen overflow-hidden flex relative">
@@ -420,6 +422,16 @@ const WelcomeScreen = () => {
                 transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
               }}
             />
+
+            {/* Beeping overlay to attract attention once fill completes */}
+            {showBeepingOverlay && (
+              <img
+                src="/BeepingHeart.png"
+                alt="Tap to explore"
+                className="heartbeat-overlay object-contain"
+                style={{ zIndex: 50 }}
+              />
+            )}
           </div>
         </div>
 

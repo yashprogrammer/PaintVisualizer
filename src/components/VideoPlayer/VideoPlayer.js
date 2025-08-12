@@ -6,6 +6,7 @@ const VideoPlayer = () => {
   const { city } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const hasNavigatedRef = useRef(false);
   const [videoUrl, setVideoUrl] = useState('/City/Video/Video.mp4'); // fallback
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,14 +54,26 @@ const VideoPlayer = () => {
     }
   }, [videoUrl, loading]);
 
-  const handleVideoEnd = () => {
-    // Navigate to hotspots selection after video ends
+  const maybeNavigate = () => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
     navigate(`/hotspots/${city}`);
   };
 
+  const handleVideoEnd = () => {
+    maybeNavigate();
+  };
+
   const handleVideoClick = () => {
-    // Allow users to skip video by clicking
-    navigate(`/hotspots/${city}`);
+    maybeNavigate();
+  };
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current || hasNavigatedRef.current) return;
+    if (videoRef.current.currentTime >= 4.5) {
+      videoRef.current.pause();
+      maybeNavigate();
+    }
   };
 
   if (loading) {
@@ -92,6 +105,7 @@ const VideoPlayer = () => {
         className="w-full h-full object-cover"
         onEnded={handleVideoEnd}
         onClick={handleVideoClick}
+        onTimeUpdate={handleTimeUpdate}
         muted
         playsInline
         style={{
