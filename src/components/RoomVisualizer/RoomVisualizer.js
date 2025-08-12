@@ -136,6 +136,17 @@ const RoomVisualizer = () => {
       if (initialColor) {
         setCurrentPalette(initialPaletteId);
         setCurrentPaintColor(initialColor);
+
+        // Pre-apply the hotspot color to Wall 1 of the pre-selected room
+        const targetSurfaceId = 'wall1';
+        setSelectedSurface(targetSurfaceId);
+        setSurfaceColors(prev => ({
+          ...prev,
+          [currentRoom]: {
+            ...(prev[currentRoom] || {}),
+            [targetSurfaceId]: initialColor,
+          },
+        }));
       } else {
         setCurrentPaintColor(null);
       }
@@ -158,8 +169,10 @@ const RoomVisualizer = () => {
       } catch (e) {
         console.warn('Failed to fetch detailed colour info', e);
       }
-      // No default paint colour; wait for user pick
-      setCurrentPaintColor(null);
+      // Keep pre-selected colour if provided via hotspot; otherwise clear
+      if (!initialColor) {
+        setCurrentPaintColor(null);
+      }
     } catch (error) {
       console.error('Failed to load colour palettes:', error);
     }
