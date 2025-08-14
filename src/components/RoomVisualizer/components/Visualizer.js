@@ -47,7 +47,7 @@ const Visualizer = ({
               if (!isSelected && !surfaceColor) return null;
 
               const styleObj = {
-                backgroundColor: surfaceColor ? surfaceColor : 'rgba(0,0,0,0.001)', // nearly transparent if no colour, just for shape
+                backgroundColor: surfaceColor ? surfaceColor : (isSelected ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.001)'),
                 maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
                 WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
                 maskSize: 'cover',
@@ -64,14 +64,17 @@ const Visualizer = ({
                 transition: 'opacity 0.2s ease',
               };
 
-              if (isSelected) {
+              // Only show selection glow when there's no paint applied
+              if (isSelected && !surfaceColor) {
                 styleObj.filter = 'drop-shadow(0 0 3px rgba(255,0,0,0.9)) drop-shadow(0 0 3px rgba(255,0,0,0.9))';
               }
+
+              const overlayOpacityClass = surfaceColor ? 'opacity-100' : (isSelected ? 'opacity-100' : 'opacity-80');
 
               return (
                 <div
                   key={surface.id}
-                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl ${isSelected ? 'opacity-100' : 'opacity-80'}`}
+                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl ${overlayOpacityClass}`}
                   style={styleObj}
                 />
               );

@@ -377,6 +377,10 @@ const RoomVisualizer = () => {
         [selectedSurface]: color
       }
     }));
+    // Deselect surface after applying color to remove selection shade
+    if (selectedSurface) {
+      setSelectedSurface(null);
+    }
   };
 
   // Remove a paint colour from the current palette shortlist
