@@ -2,6 +2,10 @@ import React from 'react';
 
 const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {} }) => {
   const [svgContent, setSvgContent] = React.useState({ 1: null, 2: null });
+  const paletteRefs = { 1: React.useRef(null), 2: React.useRef(null) };
+  const userInteractedRef = React.useRef(false);
+  const timeoutsRef = React.useRef([]);
+  const isAnimatingRef = React.useRef(false);
 
   // Utility to recolor an SVG string given an array of hex colors.
   const recolorSvg = (rawSvg, colors) => {
@@ -55,6 +59,112 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
     }
   }, [colorPalettes]);
 
+  // Utility: clear queued timeouts and remove elevation class from any paths
+  const stopIdleAnimation = React.useCallback(() => {
+    isAnimatingRef.current = false;
+    timeoutsRef.current.forEach((t) => clearTimeout(t));
+    timeoutsRef.current = [];
+    // Remove class from both palettes if present
+    [1, 2].forEach((id) => {
+      const container = paletteRefs[id]?.current;
+      if (!container) return;
+      const paths = container.querySelectorAll('.lockup-svg path.idle-elevate');
+      paths.forEach((p) => p.classList.remove('idle-elevate'));
+    });
+  }, []);
+
+  // Compute TL -> TR -> BR -> BL -> center1 -> center2 order from geometry
+  const computeAnimationOrder = React.useCallback((paths) => {
+    if (!paths || paths.length === 0) return [];
+    const items = Array.from(paths).map((p, idx) => {
+      try {
+        const b = p.getBBox();
+        return { index: idx, cx: b.x + b.width / 2, cy: b.y + b.height / 2 };
+      } catch {
+        // Fallback if getBBox fails
+        return { index: idx, cx: idx, cy: idx };
+      }
+    });
+    const xs = items.map((i) => i.cx);
+    const ys = items.map((i) => i.cy);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const takeClosest = (arr, targetX, targetY) => {
+      let bestIdx = -1;
+      let bestScore = Infinity;
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
+        const dx = it.cx - targetX;
+        const dy = it.cy - targetY;
+        const score = dx * dx + dy * dy;
+        if (score < bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+      return arr.splice(bestIdx, 1)[0];
+    };
+    const working = [...items];
+    const tl = takeClosest(working, minX, minY);
+    const tr = takeClosest(working, maxX, minY);
+    const br = takeClosest(working, maxX, maxY);
+    const bl = takeClosest(working, minX, maxY);
+    // Remaining two are centers; order by cx ascending for a stable order
+    const centers = working.sort((a, b) => a.cx - b.cx);
+    const order = [tl, tr, br, bl, ...centers].filter(Boolean).map((o) => o.index);
+    // Ensure indices are within bounds
+    return order.filter((i) => typeof i === 'number' && i >= 0 && i < paths.length);
+  }, []);
+
+  // Animate one palette once following the computed order
+  const animatePaletteOnce = React.useCallback(async (paletteId) => {
+    const container = paletteRefs[paletteId]?.current;
+    if (!container) return;
+    const paths = container.querySelectorAll('.lockup-svg path');
+    if (!paths || paths.length === 0) return;
+    const order = computeAnimationOrder(paths);
+    const HOLD_MS = 260;
+    const GAP_MS = 90;
+    for (const idx of order) {
+      if (!isAnimatingRef.current || userInteractedRef.current) return;
+      const path = paths[idx];
+      if (!path) continue;
+      // Elevate
+      path.classList.add('idle-elevate');
+      await new Promise((resolve) => {
+        const t1 = setTimeout(() => {
+          // Lower
+          path.classList.remove('idle-elevate');
+          const t2 = setTimeout(resolve, GAP_MS);
+          timeoutsRef.current.push(t2);
+        }, HOLD_MS);
+        timeoutsRef.current.push(t1);
+      });
+    }
+  }, [computeAnimationOrder]);
+
+  // Idle loop: animate vibrant (1) then cool (2), repeat until user interacts
+  React.useEffect(() => {
+    if (userInteractedRef.current) return;
+    if (!svgContent[1] || !svgContent[2]) return; // wait until svgs are injected
+    isAnimatingRef.current = true;
+    let cancelled = false;
+    const run = async () => {
+      while (!cancelled && isAnimatingRef.current && !userInteractedRef.current) {
+        await animatePaletteOnce(1);
+        if (cancelled || userInteractedRef.current) break;
+        await animatePaletteOnce(2);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+      stopIdleAnimation();
+    };
+  }, [svgContent, animatePaletteOnce, stopIdleAnimation]);
+
   const renderPaletteSvg = (paletteId, altText) => {
     const html = svgContent[paletteId];
     if (html) {
@@ -84,11 +194,15 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
       const fill = target.getAttribute('fill');
       const validHex = /^#[0-9A-F]{6}$/i;
       if (fill && validHex.test(fill)) {
+        userInteractedRef.current = true;
+        stopIdleAnimation();
         onColorPick(fill.toUpperCase());
         return; // Do not switch palette when picking a colour
       }
     }
     // Fallback: treat as palette selection
+    userInteractedRef.current = true;
+    stopIdleAnimation();
     selectPalette(paletteId);
   };
 
@@ -105,6 +219,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             <div 
               className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 1 ? 'selected-color' : ''}`}
               onClick={handleContainerClick(1)}
+              ref={paletteRefs[1]}
             >
               {renderPaletteSvg(1, 'Cool Palette')}
             </div>
@@ -118,6 +233,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             <div 
               className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 2 ? 'selected-color' : ''}`}
               onClick={handleContainerClick(2)}
+              ref={paletteRefs[2]}
             >
               {renderPaletteSvg(2, 'Vibrant Palette')}
             </div>

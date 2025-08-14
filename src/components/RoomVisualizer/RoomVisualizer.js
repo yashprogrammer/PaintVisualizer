@@ -452,13 +452,19 @@ const RoomVisualizer = () => {
           /* No scaling of the entire lockup on hover */
         }
 
-        /* Scale individual paths in the lock-up SVG */
+        /* Individual paths in the lock-up SVG (idle animation support) */
         .lockup-svg path {
-          transition: transform 0.2s ease;
+          transition: transform 0.2s ease, filter 0.2s ease;
           transform-origin: center;
         }
+        /* Hover scaling removed in favour of idle animation */
         .lockup-svg path:hover {
-          transform: scale(1.12);
+          transform: none;
+        }
+        /* Idle elevate animation state */
+        .lockup-svg path.idle-elevate {
+          transform: translateY(-3px) scale(1.12);
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.18));
         }
         .room-option:hover > div:first-child {
           transform: scale(1.05);
