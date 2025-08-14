@@ -29,6 +29,13 @@ body,
   height: 100%;
   width: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+  min-height: 100vh; /* fallback */
+  min-height: 100svh; /* small viewport height */
+  min-height: 100dvh; /* dynamic viewport height for mobile */
 }
 
 /* Global typography defaults per brand guideline */

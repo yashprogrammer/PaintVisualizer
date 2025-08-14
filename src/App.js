@@ -9,39 +9,49 @@ import RoomVisualizer from './components/RoomVisualizer/RoomVisualizer';
 
 function App() {
   useEffect(() => {
-    const documentRef = document;
-    const rootElement = document.documentElement;
+    const doc = document;
 
-    const isFullscreenActive = () => {
-      return Boolean(
-        documentRef.fullscreenElement ||
-          documentRef.webkitFullscreenElement ||
-          documentRef.msFullscreenElement
-      );
-    };
+    // If already running as an installed app (PWA standalone), skip forcing fullscreen
+    const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = typeof window.navigator.standalone === 'boolean' && window.navigator.standalone;
+    if (isStandalone || isIOSStandalone) {
+      return undefined;
+    }
 
-    const supportsFullscreen = () => {
-      return Boolean(
-        rootElement.requestFullscreen ||
-          rootElement.webkitRequestFullscreen ||
-          rootElement.msRequestFullscreen
+    const candidates = [
+      document.documentElement,
+      document.body,
+      document.getElementById('root')
+    ].filter(Boolean);
+
+    const getRequestFn = (el) =>
+      el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+
+    const isFullscreenActive = () =>
+      Boolean(
+        doc.fullscreenElement ||
+          doc.webkitFullscreenElement ||
+          doc.msFullscreenElement
       );
-    };
+
+    const supportsFullscreen = () =>
+      candidates.some((el) => typeof getRequestFn(el) === 'function');
 
     const requestFullscreen = () => {
       if (isFullscreenActive()) return;
-      const requestFn =
-        rootElement.requestFullscreen ||
-        rootElement.webkitRequestFullscreen ||
-        rootElement.msRequestFullscreen;
-      if (typeof requestFn !== 'function') return;
-      try {
-        const maybePromise = requestFn.call(rootElement);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          maybePromise.catch(() => {});
+      for (const el of candidates) {
+        const fn = getRequestFn(el);
+        if (typeof fn === 'function') {
+          try {
+            const maybePromise = fn.length > 0 ? fn.call(el, { navigationUI: 'hide' }) : fn.call(el);
+            if (maybePromise && typeof maybePromise.then === 'function') {
+              maybePromise.catch(() => {});
+            }
+            return;
+          } catch (_) {
+            // ignore and try next candidate
+          }
         }
-      } catch (error) {
-        // Silently ignore failures (browser may require a user gesture)
       }
     };
 
@@ -54,35 +64,43 @@ function App() {
 
     const onFirstInteraction = () => {
       requestFullscreen();
-      documentRef.removeEventListener('pointerdown', onFirstInteraction);
-      documentRef.removeEventListener('keydown', onFirstInteraction);
-      documentRef.removeEventListener('touchend', onFirstInteraction);
+      doc.removeEventListener('pointerdown', onFirstInteraction);
+      doc.removeEventListener('click', onFirstInteraction);
+      doc.removeEventListener('touchstart', onFirstInteraction);
+      doc.removeEventListener('touchend', onFirstInteraction);
+      doc.removeEventListener('keydown', onFirstInteraction);
     };
 
-    documentRef.addEventListener('pointerdown', onFirstInteraction, { once: true });
-    documentRef.addEventListener('keydown', onFirstInteraction, { once: true });
-    documentRef.addEventListener('touchend', onFirstInteraction, { once: true });
+    doc.addEventListener('pointerdown', onFirstInteraction, { once: true });
+    doc.addEventListener('click', onFirstInteraction, { once: true });
+    doc.addEventListener('touchstart', onFirstInteraction, { once: true });
+    doc.addEventListener('touchend', onFirstInteraction, { once: true });
+    doc.addEventListener('keydown', onFirstInteraction, { once: true });
 
     const onFullscreenChange = () => {
       if (!isFullscreenActive()) {
         // Re-arm so the next interaction returns to fullscreen
-        documentRef.addEventListener('pointerdown', onFirstInteraction, { once: true });
-        documentRef.addEventListener('keydown', onFirstInteraction, { once: true });
-        documentRef.addEventListener('touchend', onFirstInteraction, { once: true });
+        doc.addEventListener('pointerdown', onFirstInteraction, { once: true });
+        doc.addEventListener('click', onFirstInteraction, { once: true });
+        doc.addEventListener('touchstart', onFirstInteraction, { once: true });
+        doc.addEventListener('touchend', onFirstInteraction, { once: true });
+        doc.addEventListener('keydown', onFirstInteraction, { once: true });
       }
     };
 
-    documentRef.addEventListener('fullscreenchange', onFullscreenChange);
-    documentRef.addEventListener('webkitfullscreenchange', onFullscreenChange);
-    documentRef.addEventListener('MSFullscreenChange', onFullscreenChange);
+    doc.addEventListener('fullscreenchange', onFullscreenChange);
+    doc.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    doc.addEventListener('MSFullscreenChange', onFullscreenChange);
 
     return () => {
-      documentRef.removeEventListener('pointerdown', onFirstInteraction);
-      documentRef.removeEventListener('keydown', onFirstInteraction);
-      documentRef.removeEventListener('touchend', onFirstInteraction);
-      documentRef.removeEventListener('fullscreenchange', onFullscreenChange);
-      documentRef.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      documentRef.removeEventListener('MSFullscreenChange', onFullscreenChange);
+      doc.removeEventListener('pointerdown', onFirstInteraction);
+      doc.removeEventListener('click', onFirstInteraction);
+      doc.removeEventListener('touchstart', onFirstInteraction);
+      doc.removeEventListener('touchend', onFirstInteraction);
+      doc.removeEventListener('keydown', onFirstInteraction);
+      doc.removeEventListener('fullscreenchange', onFullscreenChange);
+      doc.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+      doc.removeEventListener('MSFullscreenChange', onFullscreenChange);
     };
   }, []);
 
