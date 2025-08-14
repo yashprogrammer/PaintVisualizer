@@ -10,6 +10,8 @@ const VideoPlayer = () => {
   const [videoUrl, setVideoUrl] = useState('/City/Video/Video.mp4'); // fallback
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isPreparingHotspots, setIsPreparingHotspots] = useState(false);
+  const [prepMessage, setPrepMessage] = useState('');
 
   useEffect(() => {
     const fetchVideoUrl = async () => {
@@ -22,15 +24,23 @@ const VideoPlayer = () => {
       try {
         setLoading(true);
 
-        // Fetch cached video list
         const sanitizedCity = city.toLowerCase().trim();
+
+        // Prefer pre-fetched object URL if present
+        if (typeof window !== 'undefined' && window.cityVideoUrls && window.cityVideoUrls[sanitizedCity]) {
+          setVideoUrl(window.cityVideoUrls[sanitizedCity]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch cached video list
         const cityData = await ApiService.getCityData(sanitizedCity);
 
         if (cityData && cityData.videos && cityData.videos.length > 0) {
-          console.log(`Using cached video for ${sanitizedCity}:`, cityData.videos[0]);
+          console.log(`Using API video for ${sanitizedCity}:`, cityData.videos[0]);
           setVideoUrl(cityData.videos[0]);
         } else {
-          console.log(`No cached video for ${sanitizedCity}, using fallback`);
+          console.log(`No API video for ${sanitizedCity}, using fallback`);
         }
 
         setLoading(false);
@@ -54,52 +64,89 @@ const VideoPlayer = () => {
     }
   }, [videoUrl, loading]);
 
-  const maybeNavigate = () => {
-    if (hasNavigatedRef.current) return;
-    hasNavigatedRef.current = true;
-    navigate(`/hotspots/${city}`);
+  const preloadImage = (src) => {
+    return new Promise((resolve) => {
+      if (!src) return resolve();
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = src;
+    });
+  };
+
+  const prepareAndNavigateToHotspots = async () => {
+    if (hasNavigatedRef.current || isPreparingHotspots) return;
+    setIsPreparingHotspots(true);
+    setPrepMessage('Preparing hotspots...');
+    try {
+      if (videoRef.current) {
+        try { videoRef.current.pause(); } catch (_) {}
+      }
+      const sanitizedCity = city.toLowerCase().trim();
+      const cityData = await ApiService.getCityData(sanitizedCity);
+      setPrepMessage('Loading hotspot image...');
+      await preloadImage(cityData?.hotspotImage);
+      hasNavigatedRef.current = true;
+      navigate(`/hotspots/${city}`, { state: { cityData, imagePreloaded: true } });
+    } catch (e) {
+      console.warn('Failed to prepare hotspots before navigation:', e);
+      hasNavigatedRef.current = true;
+      navigate(`/hotspots/${city}`);
+    } finally {
+      setIsPreparingHotspots(false);
+      setPrepMessage('');
+    }
   };
 
   const handleVideoEnd = () => {
-    maybeNavigate();
+    prepareAndNavigateToHotspots();
   };
 
   const handleVideoClick = () => {
-    maybeNavigate();
+    prepareAndNavigateToHotspots();
   };
 
   const handleTimeUpdate = () => {
     if (!videoRef.current || hasNavigatedRef.current) return;
     if (videoRef.current.currentTime >= 4.5) {
-      videoRef.current.pause();
-      maybeNavigate();
+      try { videoRef.current.pause(); } catch (_) {}
+      prepareAndNavigateToHotspots();
     }
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading video...</div>
-      </div>
-    );
-  }
+  // No full-screen loader: keep page content, show overlay badge instead
 
-  if (error) {
-    return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
-        <div className="text-xl mb-4">Error: {error}</div>
-        <button
-          onClick={() => navigate('/city-selection')}
-          className="bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          Back to City Selection
-        </button>
-      </div>
-    );
-  }
+  // Error banner overlay instead of page swap
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden">
+      {isPreparingHotspots && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
+            {prepMessage || 'Loading hotspots...'}
+          </div>
+        </div>
+      )}
+      {loading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
+            Loading video...
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40">
+          <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-red-600/80 text-white shadow-lg">
+            <span>Error: {error}</span>
+            <button
+              onClick={() => navigate('/city-selection')}
+              className="bg-white/20 hover:bg-white/30 transition-colors px-3 py-1 rounded"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
       <video
         ref={videoRef}
         className="w-full h-full object-cover"

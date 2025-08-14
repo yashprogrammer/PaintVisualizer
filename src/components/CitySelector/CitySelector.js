@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSpring, useTransition, animated, easings } from '@react-spring/web';
 import { useNavigate } from 'react-router-dom';
+import ApiService from '../../services/api';
 
 const cities = [
   { name: 'Bali', image: '/City/Bali H Small.png', blurredImage: '/City/Blurred/Bali H Small.jpg', video: '/City/SelectionTransition/Bali.mp4' },
@@ -30,6 +31,8 @@ const CitySelector = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const dragRef = useRef({ startX: 0, lastX: 0, startTime: 0, lastTime: 0, pointerId: null });
+  const [isGlobalLoading, setIsGlobalLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Loading...');
 
   // Retrieve preloaded video from localStorage if available
   const getVideoSource = (city) => {
@@ -200,10 +203,50 @@ const CitySelector = () => {
     }, 800);
   };
 
-  const handleCityClick = () => {
+  const preloadImage = (src) => {
+    return new Promise((resolve) => {
+      if (!src) return resolve();
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = src;
+    });
+  };
+
+  const prefetchVideo = async (url, key) => {
+    try {
+      if (!url || !key) return;
+      setLoadingText('Buffering intro video...');
+      const res = await fetch(url, { cache: 'force-cache' });
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      if (typeof window !== 'undefined') {
+        window.cityVideoUrls = window.cityVideoUrls || {};
+        window.cityVideoUrls[key] = objectUrl;
+        window.cityVideoUrls[key.toLowerCase()] = objectUrl;
+      }
+    } catch (_) {
+      // Non-blocking
+    }
+  };
+
+  const handleCityClick = async () => {
     const selectedCity = cities[selectedIndex];
-    // Navigate to video player with city name as parameter
-    navigate(`/video/${selectedCity.name.toLowerCase()}`);
+    const cityKey = selectedCity.name.toLowerCase();
+    setIsGlobalLoading(true);
+    setLoadingText('Preparing experience...');
+    try {
+      const cityData = await ApiService.getCityData(cityKey);
+      setLoadingText('Loading assets...');
+      await preloadImage(cityData?.hotspotImage);
+      const introVideoUrl = (cityData?.videos && cityData.videos[0]) ? cityData.videos[0] : '/City/Video/Video.mp4';
+      await prefetchVideo(introVideoUrl, cityKey);
+    } catch (e) {
+      console.warn('Prefetch failed, continuing to navigate:', e);
+    } finally {
+      navigate(`/video/${cityKey}`);
+      setIsGlobalLoading(false);
+    }
   };
 
   // Calculate translateX based on current position
@@ -566,6 +609,14 @@ const CitySelector = () => {
           </div> 
         </div>
       </div>
+
+      {isGlobalLoading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="px-5 py-3 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
+            {loadingText}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

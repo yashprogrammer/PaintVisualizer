@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../services/api';
 
 const HotspotSelector = () => {
   const { city } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cityData, setCityData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,6 +27,16 @@ const HotspotSelector = () => {
       if (sanitizedCity !== city.toLowerCase().trim()) {
         setError("Invalid city parameter");
         setLoading(false);
+        return;
+      }
+
+      // If we were navigated with preloaded data, use it and skip fetching
+      if (location.state && location.state.cityData) {
+        setCityData(location.state.cityData);
+        setLoading(false);
+        if (location.state.imagePreloaded) {
+          setImageLoaded(true);
+        }
         return;
       }
 
@@ -56,7 +67,7 @@ const HotspotSelector = () => {
     };
 
     fetchCityData();
-  }, [city]);
+  }, [city, location.state]);
 
   // Compute a filtered list of hotspots where overlapping points are deduplicated
   useEffect(() => {
@@ -129,55 +140,56 @@ const HotspotSelector = () => {
     setError("Failed to load hotspot image");
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading hotspots...</div>
-      </div>
-    );
-  }
+  // No full-screen black loader; show lightweight transparent overlay at render time
 
-  if (error) {
-    return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
-        <div className="text-xl mb-4">Error: {error}</div>
-        <div className="text-sm mb-4 opacity-70">
-          Make sure the backend server is running on port 15205
-        </div>
-        <button 
-          onClick={() => navigate('/city-selection')}
-          className="bg-white text-black px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          Back to City Selection
-        </button>
-      </div>
-    );
-  }
+  // Error banner overlay instead of page swap
 
-  if (!cityData) return null;
-
-  const hotspotsToRender = (filteredHotspots && filteredHotspots.length > 0)
-    ? filteredHotspots
-    : (cityData.hotspots || []);
+  const hotspotsToRender = cityData?.hotspots
+    ? ((filteredHotspots && filteredHotspots.length > 0)
+      ? filteredHotspots
+      : cityData.hotspots)
+    : [];
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+      {loading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
+            Loading hotspots...
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40">
+          <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-red-600/80 text-white shadow-lg">
+            <span>Error: {error}</span>
+            <button 
+              onClick={() => navigate('/city-selection')}
+              className="bg-white/20 hover:bg-white/30 transition-colors px-3 py-1 rounded"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
       {/* Background Image */}
       <div className="absolute inset-0">
-        <img 
-          src={cityData.hotspotImage}
-          alt={`${cityData.name} hotspot selection`}
-          className="w-full h-full object-cover"
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-          style={{
-            opacity: imageLoaded ? 1 : 0,
-            transition: 'opacity 0.3s ease-in-out'
-          }}
-        />
+        {cityData?.hotspotImage && (
+          <img 
+            src={cityData.hotspotImage}
+            alt={`${cityData.name} hotspot selection`}
+            className="w-full h-full object-cover"
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            style={{
+              opacity: imageLoaded ? 1 : 0,
+              transition: 'opacity 0.3s ease-in-out'
+            }}
+          />
+        )}
         {!imageLoaded && (
-          <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-            <div className="text-white text-lg">Loading image...</div>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2">
+            <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">Loading image...</div>
           </div>
         )}
       </div>
