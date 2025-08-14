@@ -333,6 +333,33 @@ const CitySelector = () => {
               </div>
             </animated.div>
 
+            {/* Clickable overlay covering the heart area */}
+            <button
+              type="button"
+              aria-label="Explore selected location"
+              onClick={handleCityClick}
+              className="absolute"
+              style={{
+                width: '70vw',
+                height: '70vw',
+                maxWidth: '1400px',
+                maxHeight: '1400px',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                WebkitMask: 'url(/SelectionHeartMask.svg) no-repeat center',
+                mask: 'url(/SelectionHeartMask.svg) no-repeat center',
+                WebkitMaskSize: 'contain',
+                maskSize: 'contain',
+                WebkitMaskPosition: 'center',
+                maskPosition: 'center',
+                backgroundColor: 'rgba(0,0,0,0.01)',
+                cursor: 'pointer',
+                zIndex: 50,
+                border: 'none',
+                padding: 0,
+              }}
+            />
             {/* Carousel container */}
             <div
               className="relative w-full flex items-center overflow-hidden"
