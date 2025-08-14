@@ -31,6 +31,7 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  touch-action: manipulation;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;
   min-height: 100vh; /* fallback */
@@ -153,4 +154,10 @@ body,
     will-change: transform;
     pointer-events: none;
   }
+}
+
+.fullscreen-container {
+  height: var(--app-dvh, 100dvh);
+  width: 100%;
+  max-height: 100%;
 }
