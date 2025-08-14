@@ -292,10 +292,11 @@ const CitySelector = () => {
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
               }}
             >
               {/* Base heart layer */}
-              <div className="absolute inset-0 w-full h-full">
+              <div className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
                 <img 
                   src="/SelectionHeart.svg" 
                   alt="Heart" 
@@ -313,6 +314,7 @@ const CitySelector = () => {
                   maskSize: 'contain',
                   WebkitMaskPosition: 'center',
                   maskPosition: 'center',
+                  pointerEvents: 'none',
                 }}
               >
                 {/* Video background crossfading between cities */}
