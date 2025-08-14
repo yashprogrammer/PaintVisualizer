@@ -14,14 +14,23 @@ const Visualizer = ({
   selectPaint,
   removePaint,
   isMasksLoaded,
-  maskImagesRef
+  maskImagesRef,
+  onClearAreas,
+  onShare
 }) => {
   return (
-    <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden px-4 lg:px-[25px]  w-1/2 flex-shrink-0">
+    <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden px-4 lg:px-[25px]  w-1/2 flex-shrink-0 h-full">
       <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-center w-full font-brand">
         <p className="block leading-normal">Visualizer</p>
       </div>
-      <div className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-2xl lg:rounded-3xl w-full border-[3px] lg:border-[5px] border-solid border-[#d2d2d2]">
+      <div
+        className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-3xl w-full"
+        style={{
+          background: 'rgba(255, 255, 255, 0.80)',
+          boxShadow:
+            '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
+        }}
+      >
         
         {/* Room Visualization Area */}
         <div className="flex-1 flex flex-col gap-2.5 items-center justify-center overflow-hidden pb-0 pt-4 lg:pt-8 px-4 lg:px-[18px] w-full min-h-0">
@@ -30,6 +39,16 @@ const Visualizer = ({
             className="flex-1 w-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
             onClick={handleCanvasClick}
           >
+            {/* Clear Areas pill */}
+            <div className="absolute top-6 right-6 bg-white text-black px-3 py-2 rounded-lg flex items-center gap-2 shadow-sm z-[200]">
+              <button
+                type="button"
+                className="text-[12px] font-medium"
+                onClick={(e) => { e.stopPropagation(); onClearAreas && onClearAreas(); }}
+              >
+                CLEAR AREAS
+              </button>
+            </div>
             {/* Base room image */}
             <img 
               src={roomData[currentRoom].baseImage} 
@@ -94,8 +113,15 @@ const Visualizer = ({
       
          
           </div>
-          <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand">
+          <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand w-full flex items-center justify-between px-6">
             <p className="block leading-normal">Select surface to paint</p>
+            <button
+              type="button"
+              onClick={onShare}
+              className="bg-white text-black text-[16px] px-[18px] py-2 rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50"
+            >
+              Share
+            </button>
           </div>
         </div>
         

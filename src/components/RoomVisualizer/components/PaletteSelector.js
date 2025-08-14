@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {} }) => {
+const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {}, cityName = '' }) => {
   const [svgContent, setSvgContent] = React.useState({ 1: null, 2: null });
   const paletteRefs = { 1: React.useRef(null), 2: React.useRef(null) };
   const userInteractedRef = React.useRef(false);
@@ -207,11 +207,23 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
   };
 
   return (
-    <div className="column-1 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px] w-1/4 flex-shrink-0">
+    <div className="column-1 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
       <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-left w-full font-brand">
         <p className="block leading-normal">Color Lock UP</p>
+        {cityName ? (
+          <div className="mt-1 text-[#616161] text-[16px] lg:text-[20px] font-sans">
+            <p className="block leading-normal whitespace-pre">{cityName}</p>
+          </div>
+        ) : null}
       </div>
-      <div className="container-height flex-1 relative rounded-2xl lg:rounded-3xl w-full border-[3px] lg:border-[5px] border-solid border-[#d2d2d2]">
+      <div
+        className="container-height flex-1 relative rounded-3xl w-full"
+        style={{
+          background: 'rgba(255, 255, 255, 0.80)',
+          boxShadow:
+            '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
+        }}
+      >
         <div className="flex flex-col gap-6 lg:gap-12 h-full items-center justify-center overflow-hidden px-4 lg:px-14 py-2.5 relative w-full">
           
           {/* Palette 1 */}

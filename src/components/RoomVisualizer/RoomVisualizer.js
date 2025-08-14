@@ -39,6 +39,7 @@ const RoomVisualizer = () => {
     }
   });
   const [colorInfo, setColorInfo] = useState({});
+  const [cityLabel, setCityLabel] = useState('');
 
   // Refs for canvas operations
   const containerRef = useRef(null);
@@ -132,6 +133,9 @@ const RoomVisualizer = () => {
         1: { name: 'Vibrant', colors: vibrantColors, paintColors: buildPaintArray(vibrantColors) },
         2: { name: 'Calm', colors: calmColors, paintColors: buildPaintArray(calmColors) }
       });
+
+      // Set city label for UI (left column subheader)
+      setCityLabel(cityData?.name || city || '');
 
       if (initialColor) {
         setCurrentPalette(initialPaletteId);
@@ -432,8 +436,48 @@ const RoomVisualizer = () => {
     setCurrentRoom(roomType);
   };
 
+  // Clear all painted areas for the current room
+  const clearCurrentRoomSurfaces = () => {
+    setSurfaceColors(prev => ({
+      ...prev,
+      [currentRoom]: {}
+    }));
+    setSelectedSurface(null);
+  };
+
+  // Share current state (city + current paint color) via Web Share API or clipboard fallback
+  const handleShare = async () => {
+    try {
+      const url = new URL(window.location.href);
+      if (currentPaintColor) {
+        url.searchParams.set('color', encodeURIComponent(currentPaintColor.replace(/^#/, '')));
+      } else {
+        url.searchParams.delete('color');
+      }
+      const shareData = {
+        title: 'Room Visualizer',
+        text: 'Check out my room palette',
+        url: url.toString()
+      };
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareData.url);
+        // Optional: toast could be added; keeping silent to avoid alerts
+      }
+    } catch (e) {
+      console.warn('Share failed:', e);
+    }
+  };
+
   return (
-    <div className="bg-white w-screen h-screen overflow-hidden font-['Inter',sans-serif]">
+    <div
+      className="w-screen h-screen overflow-hidden font-['Inter',sans-serif]"
+      style={{
+        background:
+          'linear-gradient(115deg, rgba(200, 214, 255, 0.40) 0%, rgba(226, 226, 226, 0.40) 135.34%), #FFF'
+      }}
+    >
       <style jsx>{`
         .color-palette {
           background: linear-gradient(45deg, #8B5FB5 25%, #9B6FC5 25%, #9B6FC5 50%, #7A9CC6 50%, #7A9CC6 75%, #8FA9D0 75%);
@@ -531,12 +575,13 @@ const RoomVisualizer = () => {
           }
         }
       `}</style>
-      <div className="main-container bg-white flex flex-row items-stretch justify-start w-full h-full py-16">
+      <div className="main-container flex flex-row items-center justify-start w-full h-full py-12 px-6 gap-6">
         <PaletteSelector
           currentPalette={currentPalette}
           selectPalette={selectPalette}
           colorPalettes={colorPalettes}
           onColorPick={handleColorPick}
+          cityName={cityLabel}
         />
         <Visualizer
           currentRoom={currentRoom}
@@ -552,6 +597,8 @@ const RoomVisualizer = () => {
           isMasksLoaded={isMasksLoaded}
           maskImagesRef={maskImagesRef}
           removePaint={removePaint}
+          onClearAreas={clearCurrentRoomSurfaces}
+          onShare={handleShare}
         />
         <RoomOptions
           currentRoom={currentRoom}
