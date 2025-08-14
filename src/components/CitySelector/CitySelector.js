@@ -27,6 +27,9 @@ const CitySelector = () => {
   const [playVideo, setPlayVideo] = useState(true);
   const [animationKey, setAnimationKey] = useState(0); // Add animation key state
   const [instantJump, setInstantJump] = useState(false); // disable CSS transition for index corrections
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragRef = useRef({ startX: 0, lastX: 0, startTime: 0, lastTime: 0, pointerId: null });
 
   // Retrieve preloaded video from localStorage if available
   const getVideoSource = (city) => {
@@ -83,6 +86,86 @@ const CitySelector = () => {
     // Begin slide: lock input and move right by one item
     setIsTransitioning(true);
     setVirtualIndex(prev => prev + 1);
+  };
+
+  const onPointerDown = (e) => {
+    if (isTransitioning) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // only primary button
+    setIsDragging(true);
+    const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    dragRef.current.startX = x;
+    dragRef.current.lastX = x;
+    dragRef.current.startTime = now;
+    dragRef.current.lastTime = now;
+    dragRef.current.pointerId = e.pointerId != null ? e.pointerId : null;
+    setDragOffset(0);
+    if (carouselRef.current && dragRef.current.pointerId != null && carouselRef.current.setPointerCapture) {
+      try { carouselRef.current.setPointerCapture(dragRef.current.pointerId); } catch (_) {}
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDragging) return;
+    const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : dragRef.current.lastX);
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const dx = x - dragRef.current.startX;
+    dragRef.current.lastX = x;
+    dragRef.current.lastTime = now;
+    setDragOffset(dx);
+  };
+
+  const endDrag = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const totalDx = dragRef.current.lastX - dragRef.current.startX;
+    const totalTime = Math.max(now - dragRef.current.startTime, 1);
+    const velocity = totalDx / totalTime; // px per ms
+    const absDx = Math.abs(totalDx);
+    const distanceThreshold = itemWidth * 0.2;
+    const velocityThreshold = 0.5; // ~500 px/s
+
+    let slides = 0;
+    if (absDx > distanceThreshold || Math.abs(velocity) > velocityThreshold) {
+      slides = Math.max(1, Math.min(cities.length, Math.round(absDx / itemWidth) || 1));
+    }
+
+    if (slides === 0) {
+      // If there was an actual drag, animate snap-back; else just reset
+      if (Math.abs(totalDx) > 2) {
+        setIsTransitioning(true);
+        setDragOffset(0);
+      } else {
+        setDragOffset(0);
+      }
+      return;
+    }
+
+    // Drag left (negative dx) moves to next slide (increase index)
+    const direction = totalDx < 0 ? 1 : -1;
+    const moveBy = direction * slides;
+    const nextIndex = (selectedIndex + moveBy + cities.length) % cities.length;
+
+    startAnimationSequence(nextIndex);
+    setIsTransitioning(true);
+    setDragOffset(0);
+    setVirtualIndex(prev => prev + moveBy);
+  };
+
+  const onPointerUp = (e) => {
+    endDrag();
+    if (carouselRef.current && dragRef.current.pointerId != null && carouselRef.current.releasePointerCapture) {
+      try { carouselRef.current.releasePointerCapture(dragRef.current.pointerId); } catch (_) {}
+    }
+  };
+
+  const onPointerCancel = () => {
+    endDrag();
+  };
+
+  const onPointerLeave = (e) => {
+    if (isDragging) onPointerUp(e);
   };
 
   const startAnimationSequence = (nextDisplayIndex) => {
@@ -370,6 +453,11 @@ const CitySelector = () => {
               {/* Carousel items */}
               <div 
                 ref={carouselRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerCancel}
+                onPointerLeave={onPointerLeave}
                 onTransitionEnd={() => {
                   // Sync selectedIndex to the slide that stopped under the heart
                   const realIndex = (virtualIndex - 1 + cities.length) % cities.length;
@@ -390,10 +478,11 @@ const CitySelector = () => {
                   // Sliding finished (let heart/text sequence control final state)
                   setTimeout(() => setIsTransitioning(false), 0);
                 }}
-                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''}`}
+                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 style={{
-                  transform: `translateX(${translateX}px)`,
+                  transform: `translateX(${translateX + dragOffset}px)`,
                   width: `${extendedCities.length * itemWidth}px`,
+                  touchAction: 'pan-y',
                 }}
               >
                 {extendedCities.map((city, index) => {
