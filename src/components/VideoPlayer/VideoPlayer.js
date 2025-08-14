@@ -104,7 +104,6 @@ const VideoPlayer = () => {
         ref={videoRef}
         className="w-full h-full object-cover"
         onEnded={handleVideoEnd}
-        onClick={handleVideoClick}
         onTimeUpdate={handleTimeUpdate}
         muted
         playsInline
