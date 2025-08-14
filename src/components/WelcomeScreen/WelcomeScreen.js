@@ -4,19 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import ApiService from '../../services/api';
 import HeartColored from './HeartColored';
 import { getVideoBlob, storeVideoBlob } from '../../services/videoCache';
+import { citiesData } from '../../data/cities';
 
-const cityImages = [
-  '/City/Bali H Small.png',
-  '/City/Egypt H Small.png',
-  '/City/France H Small.png',
-  '/City/Greece H Small.png',
-  '/City/Japan H Small.png',
-  '/City/Kenya H Small.png',
-  '/City/L\'Dweep H Small.png',
-  '/City/Morocco H Small.png',
-  '/City/Spain H Small.png',
-  '/City/Vietnam H Small.png',
-];
+const cityImages = Object.values(citiesData).map((c) => `/City/${c.name} H Small.png`);
 
 const WelcomeScreen = () => {
   const contentRef = useRef(null);
@@ -40,6 +30,16 @@ const WelcomeScreen = () => {
   const SEAM_MARGIN = 30; // Min distance from background image seams where hearts cannot spawn
   const POP_INTERVAL = 200; // ms between new popup hearts
   const MAX_POPUP_HEARTS = 80; // maximum number of popup hearts allowed on screen
+  // Randomize background carousel order once per mount
+  const [carouselImages, setCarouselImages] = useState(cityImages);
+  useEffect(() => {
+    const shuffled = [...cityImages];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    setCarouselImages(shuffled);
+  }, []);
 
   // Preload raw countries data once when the welcome screen mounts. The ApiService handles
   // storing the response in both memory and localStorage so downstream components can
@@ -383,7 +383,7 @@ const WelcomeScreen = () => {
       {/* Background Layer - Carousel Container (z-index: 1) */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-[1]">
         <div className="flex animate-carousel-drift">
-          {[...cityImages, ...cityImages].map((image, index) => (
+          {[...carouselImages, ...carouselImages].map((image, index) => (
             <img
               key={index}
               src={image}
