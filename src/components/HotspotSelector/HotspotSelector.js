@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../services/api';
 
 const HotspotSelector = () => {
   const { city } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cityData, setCityData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,6 +27,16 @@ const HotspotSelector = () => {
       if (sanitizedCity !== city.toLowerCase().trim()) {
         setError("Invalid city parameter");
         setLoading(false);
+        return;
+      }
+
+      // If we were navigated with preloaded data, use it and skip fetching
+      if (location.state && location.state.cityData) {
+        setCityData(location.state.cityData);
+        setLoading(false);
+        if (location.state.imagePreloaded) {
+          setImageLoaded(true);
+        }
         return;
       }
 
@@ -56,7 +67,7 @@ const HotspotSelector = () => {
     };
 
     fetchCityData();
-  }, [city]);
+  }, [city, location.state]);
 
   // Compute a filtered list of hotspots where overlapping points are deduplicated
   useEffect(() => {

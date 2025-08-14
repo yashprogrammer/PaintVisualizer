@@ -10,6 +10,8 @@ const VideoPlayer = () => {
   const [videoUrl, setVideoUrl] = useState('/City/Video/Video.mp4'); // fallback
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isPreparingHotspots, setIsPreparingHotspots] = useState(false);
+  const [prepMessage, setPrepMessage] = useState('');
 
   useEffect(() => {
     const fetchVideoUrl = async () => {
@@ -62,25 +64,53 @@ const VideoPlayer = () => {
     }
   }, [videoUrl, loading]);
 
-  const maybeNavigate = () => {
-    if (hasNavigatedRef.current) return;
-    hasNavigatedRef.current = true;
-    navigate(`/hotspots/${city}`);
+  const preloadImage = (src) => {
+    return new Promise((resolve) => {
+      if (!src) return resolve();
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = src;
+    });
+  };
+
+  const prepareAndNavigateToHotspots = async () => {
+    if (hasNavigatedRef.current || isPreparingHotspots) return;
+    setIsPreparingHotspots(true);
+    setPrepMessage('Preparing hotspots...');
+    try {
+      if (videoRef.current) {
+        try { videoRef.current.pause(); } catch (_) {}
+      }
+      const sanitizedCity = city.toLowerCase().trim();
+      const cityData = await ApiService.getCityData(sanitizedCity);
+      setPrepMessage('Loading hotspot image...');
+      await preloadImage(cityData?.hotspotImage);
+      hasNavigatedRef.current = true;
+      navigate(`/hotspots/${city}`, { state: { cityData, imagePreloaded: true } });
+    } catch (e) {
+      console.warn('Failed to prepare hotspots before navigation:', e);
+      hasNavigatedRef.current = true;
+      navigate(`/hotspots/${city}`);
+    } finally {
+      setIsPreparingHotspots(false);
+      setPrepMessage('');
+    }
   };
 
   const handleVideoEnd = () => {
-    maybeNavigate();
+    prepareAndNavigateToHotspots();
   };
 
   const handleVideoClick = () => {
-    maybeNavigate();
+    prepareAndNavigateToHotspots();
   };
 
   const handleTimeUpdate = () => {
     if (!videoRef.current || hasNavigatedRef.current) return;
     if (videoRef.current.currentTime >= 4.5) {
-      videoRef.current.pause();
-      maybeNavigate();
+      try { videoRef.current.pause(); } catch (_) {}
+      prepareAndNavigateToHotspots();
     }
   };
 
@@ -90,6 +120,13 @@ const VideoPlayer = () => {
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden">
+      {isPreparingHotspots && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
+            {prepMessage || 'Loading hotspots...'}
+          </div>
+        </div>
+      )}
       {loading && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
