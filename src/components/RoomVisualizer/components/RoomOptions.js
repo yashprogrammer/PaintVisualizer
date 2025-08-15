@@ -2,33 +2,15 @@ import React from 'react';
 import { roomData } from '../../../data/roomData';
 
 const RoomOptions = ({ currentRoom, selectRoom }) => {
-  // Landscape scaling (mobile) relative to FHD baseline
-  const [landscapeScale, setLandscapeScale] = React.useState(1);
-  React.useEffect(() => {
-    const BASE_WIDTH = 1920;
-    const BASE_HEIGHT = 1080;
-    const updateScale = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const isLandscape = w > h;
-      const isMobile = w <= 1024;
-      if (isLandscape && isMobile) {
-        const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
-        setLandscapeScale(s);
-      } else {
-        setLandscapeScale(1);
-      }
-    };
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    window.addEventListener('orientationchange', updateScale);
-    return () => {
-      window.removeEventListener('resize', updateScale);
-      window.removeEventListener('orientationchange', updateScale);
-    };
-  }, []);
+  // Font sizing is now controlled globally via `.room-name-label` CSS in `RoomVisualizer.js`.
   return (
-    <div className="column-3 column-padding flex flex-col items-center justify-between overflow-hidden py-6 px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
+    <React.Fragment>
+      <style>{`
+        @media (orientation: landscape) and (max-width: 1024px) {
+          .room-options .room-name-label { font-size: 10px !important; }
+        }
+      `}</style>
+      <div className="room-options column-3 column-padding flex flex-col items-center justify-between overflow-hidden py-6 px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
       <div
         className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-3xl w-full"
         style={{
@@ -81,15 +63,12 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
                   >
                     <span 
                       className={`font-medium room-name-label ${currentRoom === roomKey ? '' : 'text-white font-brand'}`}
-                      style={currentRoom === roomKey ? {
+                      style={{
                         color: '#FFF',
                         textAlign: 'right',
                         fontFamily: '"Open Sans"',
                         fontWeight: '700',
-                        lineHeight: 'normal',
-                        fontSize: `${Math.max(10, Math.round(14 * landscapeScale))}px`
-                      } : {
-                        fontSize: `${Math.max(10, Math.round(12 * landscapeScale))}px`
+                        lineHeight: 'normal'
                       }}
                     >
                       {room.name}
@@ -133,7 +112,8 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
         
         </div>
       </div>
-    </div>
+      </div>
+    </React.Fragment>
   );
 };
 

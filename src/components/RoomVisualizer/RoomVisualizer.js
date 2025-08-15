@@ -583,7 +583,7 @@ const RoomVisualizer = () => {
         .title-text { font-size: calc(20px * var(--vr-scale)) !important; }
         .vibrant-text { font-size: calc(40px * var(--vr-scale)) !important; }
         .surface-text { font-size: calc(28px * var(--vr-scale)) !important; }
-        .room-name-label { font-size: calc(24px * var(--vr-scale)) !important; }
+        .room-name-label { font-size: clamp(10px, calc(14px * var(--vr-scale)), 18px) !important; }
         .subline-text { font-size: calc(12px * var(--vr-scale)) !important; }
       `}</style>
       <div className="main-container flex flex-row items-center justify-start w-full h-full  ">
