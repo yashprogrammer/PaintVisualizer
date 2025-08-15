@@ -258,7 +258,7 @@ const CitySelector = () => {
   };
 
   const onPointerDown = (e) => {
-    if (isTransitioning) return;
+    if (isTransitioning || isGlobalLoading) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return; // only primary button
     setIsDragging(true);
     const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
@@ -275,7 +275,7 @@ const CitySelector = () => {
   };
 
   const onPointerMove = (e) => {
-    if (!isDragging) return;
+    if (!isDragging || isGlobalLoading) return;
     const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : dragRef.current.lastX);
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const dx = x - dragRef.current.startX;
@@ -397,6 +397,7 @@ const CitySelector = () => {
   };
 
   const handleCityClick = async () => {
+    if (isGlobalLoading) return;
     const selectedCity = cities[selectedIndex];
     const cityKey = selectedCity.name.toLowerCase();
     setIsGlobalLoading(true);
@@ -646,7 +647,7 @@ const CitySelector = () => {
               {/* Navigation buttons */}
               <button 
                 onClick={handlePrev} 
-                disabled={isTransitioning}
+                disabled={isTransitioning || isGlobalLoading}
                 className="absolute text-white hover:text-white/80 transition z-30 bg-black/30 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
                 style={{ left: `${clampNumber(8, viewportWidth * 0.02, 48)}px`, top: '50%', transform: 'translateY(-50%)', width: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, height: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, fontSize: `${clampNumber(18, viewportWidth * 0.022, 26)}px` }}
               >
@@ -655,7 +656,7 @@ const CitySelector = () => {
               
               <button 
                 onClick={handleNext} 
-                disabled={isTransitioning}
+                disabled={isTransitioning || isGlobalLoading}
                 className="absolute text-white hover:text-white/80 transition z-30 bg-black/30 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
                 style={{ right: `${clampNumber(8, viewportWidth * 0.02, 48)}px`, top: '50%', transform: 'translateY(-50%)', width: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, height: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, fontSize: `${clampNumber(18, viewportWidth * 0.022, 26)}px` }}
               >
@@ -690,11 +691,11 @@ const CitySelector = () => {
                   // Sliding finished (let heart/text sequence control final state)
                   setTimeout(() => setIsTransitioning(false), 0);
                 }}
-                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isGlobalLoading ? 'cursor-wait' : (isDragging ? 'cursor-grabbing' : 'cursor-grab')}`}
                 style={{
                   transform: `translateX(${translateX + dragOffset}px)`,
                   width: `${extendedCities.length * itemWidth}px`,
-                  touchAction: 'pan-y',
+                  touchAction: isGlobalLoading ? 'none' : 'pan-y',
                 }}
               >
                 {extendedCities.map((city, index) => {
