@@ -10,21 +10,22 @@ const cityImages = Object.values(citiesData).map((c) => `/City/${c.name} H Small
 
 // Helper for optimized image sources
 const buildOptimized = (src) => {
-  if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+  if (!src || typeof src !== 'string') return { lqip: src, low: src, medium: src, original: src };
   const lastDot = src.lastIndexOf('.');
-  if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+  if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, low: `/optimized${src}-low`, medium: `/optimized${src}-med`, original: src };
   const base = src.substring(0, lastDot);
   const ext = src.substring(lastDot);
   return {
     lqip: `/optimized${base}-lqip.jpg`,
+    low: `/optimized${base}-low${ext}`,
     medium: `/optimized${base}-med${ext}`,
     original: src,
   };
 };
 
-// Progressive image loader that displays LQIP first, then medium, then original
+// Progressive image loader that displays LQIP → Low → Medium → Original
 // Props:
-// - startAt: 'lqip' | 'medium' (default 'lqip') - where to start for the first paint
+// - startAt: 'lqip' | 'low' | 'medium' (default 'lqip') - where to start for the first paint
 // - canUpgrade: if false, holds at current quality and defers preloads
 // - enableBlur: apply small blur while upgrading (disable for transparent PNGs)
 const ProgressiveImage = ({
@@ -38,16 +39,18 @@ const ProgressiveImage = ({
   enableBlur = true,
   onOriginalLoad,
 }) => {
-  const { lqip, medium, original } = buildOptimized(src);
-  const [currentSrc, setCurrentSrc] = useState(startAt === 'medium' ? medium : lqip);
+  const { lqip, low, medium, original } = buildOptimized(src);
+  const initialSrc = startAt === 'medium' ? medium : startAt === 'low' ? low : lqip;
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
   const [isBlurred, setIsBlurred] = useState(enableBlur);
   const onOriginalLoadRef = useRef(onOriginalLoad);
   useEffect(() => { onOriginalLoadRef.current = onOriginalLoad; }, [onOriginalLoad]);
 
-  // Reset to LQIP when the source changes
+  // Reset to starting quality when the source changes
   useEffect(() => {
     let cancelled = false;
-    setCurrentSrc(startAt === 'medium' ? medium : lqip);
+    const startSrc = startAt === 'medium' ? medium : startAt === 'low' ? low : lqip;
+    setCurrentSrc(startSrc);
     setIsBlurred(enableBlur);
 
     // If we cannot upgrade yet, stop here (we'll upgrade when canUpgrade flips true)
@@ -55,29 +58,51 @@ const ProgressiveImage = ({
       return () => { cancelled = true; };
     }
 
-    const mediumImg = new Image();
-    mediumImg.decoding = 'async';
-    mediumImg.src = medium;
-    mediumImg.onload = () => {
-      if (cancelled) return;
-      setCurrentSrc(medium);
+    const loadImage = (url, onSuccess) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      img.onload = () => { if (!cancelled) onSuccess && onSuccess(); };
+      img.onerror = () => { if (!cancelled) onSuccess && onSuccess('error'); };
+    };
 
-      const originalImg = new Image();
-      originalImg.decoding = 'async';
-      originalImg.src = original;
-      originalImg.onload = () => {
+    const goOriginal = () => {
+      loadImage(original, () => {
         if (cancelled) return;
         setCurrentSrc(original);
-        // soften transition a bit then remove blur
         if (enableBlur) {
           setTimeout(() => { if (!cancelled) setIsBlurred(false); }, 120);
         }
         if (onOriginalLoadRef.current) onOriginalLoadRef.current();
-      };
+      });
     };
 
+    const goMedium = () => {
+      loadImage(medium, () => {
+        if (cancelled) return;
+        setCurrentSrc(medium);
+        goOriginal();
+      });
+    };
+
+    const goLow = () => {
+      loadImage(low, () => {
+        if (cancelled) return;
+        setCurrentSrc(low);
+        goMedium();
+      });
+    };
+
+    if (startAt === 'medium') {
+      goOriginal();
+    } else if (startAt === 'low') {
+      goMedium();
+    } else {
+      goLow();
+    }
+
     return () => { cancelled = true; };
-  }, [src, lqip, medium, original, canUpgrade, startAt, enableBlur]);
+  }, [src, lqip, low, medium, original, canUpgrade, startAt, enableBlur]);
 
   return (
     <img
@@ -117,8 +142,19 @@ const WelcomeScreen = () => {
   const SEAM_MARGIN = 30; // Min distance from background image seams where hearts cannot spawn
   const POP_INTERVAL = 200; // ms between new popup hearts
   const MAX_POPUP_HEARTS = 80; // maximum number of popup hearts allowed on screen
+  // Animation speeds
+  const CAROUSEL_DURATION_S = 240; // slower drift to match original vw/s with 3 slides
+  const HEART_DRIFT_DISTANCE_VW = 6; // keep same drift distance
+  // For three slides, the container travels 200vw per cycle (from 0 to -200vw)
+  const HEART_DRIFT_DURATION_S = (CAROUSEL_DURATION_S * HEART_DRIFT_DISTANCE_VW) / 200; // match carousel vw/s
   // Randomize background carousel order once per mount
   const [carouselImages, setCarouselImages] = useState(cityImages);
+  // Render three images at a time for the drifting background
+  const [carouselIndices, setCarouselIndices] = useState(() => ({
+    first: 0,
+    second: cityImages.length > 1 ? 1 : 0,
+    third: cityImages.length > 2 ? 2 : (cityImages.length > 1 ? 1 : 0),
+  }));
   // Gate background upgrades until center graphics reach original quality
   const [centerOriginalCount, setCenterOriginalCount] = useState(0);
   const centerReady = centerOriginalCount >= 2;
@@ -129,7 +165,30 @@ const WelcomeScreen = () => {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     setCarouselImages(shuffled);
+    // Reset three-slot indices after shuffling
+    setCarouselIndices({
+      first: 0,
+      second: shuffled.length > 1 ? 1 : 0,
+      third: shuffled.length > 2 ? 2 : (shuffled.length > 1 ? 1 : 0),
+    });
   }, []);
+
+  // When animation completes (2nd image fully passed), restart with a fresh random order
+  const handleCarouselIteration = () => {
+    setCarouselImages((prev) => {
+      const shuffled = [...prev];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setCarouselIndices({
+        first: 0,
+        second: shuffled.length > 1 ? 1 : 0,
+        third: shuffled.length > 2 ? 2 : (shuffled.length > 1 ? 1 : 0),
+      });
+      return shuffled;
+    });
+  };
 
   // Keep the FHD layout proportions across all viewports
   useEffect(() => {
@@ -485,19 +544,50 @@ const WelcomeScreen = () => {
     <div className="h-screen w-screen overflow-hidden flex relative">
       {/* Background Layer - Carousel Container (z-index: 1) */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-[1]">
-        <div className="flex animate-carousel-drift">
-          {[...carouselImages, ...carouselImages].map((image, index) => (
+        <div
+          className="flex animate-carousel-drift"
+          onAnimationIteration={handleCarouselIteration}
+          style={{ animationDuration: `${CAROUSEL_DURATION_S}s` }}
+        >
+          {/* First slide */}
+          {carouselImages.length > 0 && (
             <ProgressiveImage
-              key={index}
-              src={image}
-              alt={`City ${index}`}
-              className="h-full object-cover"
-              style={{ width: 'auto', height: '100vh' }}
-              loading={index < 2 ? 'eager' : 'lazy'}
+              key={`first-${carouselIndices.first}`}
+              src={carouselImages[carouselIndices.first]}
+              alt={`City ${carouselIndices.first}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
               canUpgrade={centerReady}
               enableBlur={false}
             />
-          ))}
+          )}
+          {/* Second slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`second-${carouselIndices.second}`}
+              src={carouselImages[carouselIndices.second]}
+              alt={`City ${carouselIndices.second}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
+            />
+          )}
+          {/* Third slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`third-${carouselIndices.third}`}
+              src={carouselImages[carouselIndices.third]}
+              alt={`City ${carouselIndices.third}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
+            />
+          )}
         </div>
       </div>
 
@@ -591,7 +681,7 @@ const WelcomeScreen = () => {
             style={{
               left: heart.x,
               top: heart.y,
-              animation: 'heart-drift 7s linear forwards',
+              animation: `heart-drift ${HEART_DRIFT_DURATION_S}s linear forwards`,
               pointerEvents: 'none',
             }}
           >

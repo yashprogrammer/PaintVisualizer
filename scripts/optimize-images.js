@@ -30,6 +30,7 @@ const EXTRA_FILES = [
   'COW_white_heart.png',
   'BeepingHeart.png',
   'Dulux.png',
+  'Overlay.png',
 ];
 
 // CLI: --dirs Room,City or --dirs Room
@@ -47,6 +48,7 @@ function parseCliDirs() {
 const allowedExtensions = new Set(['.png', '.jpg', '.jpeg']);
 
 const LQIP_WIDTH = 20; // pixels
+const LOW_WIDTH = 480; // pixels
 const MEDIUM_WIDTH = 800; // pixels
 
 async function ensureDir(dirPath) {
@@ -73,11 +75,13 @@ function buildOutputs(srcAbsPath) {
   const ext = parsed.ext.toLowerCase();
 
   const lqipRel = path.join(relDir, `${baseName}-lqip.jpg`);
+  const lowRel = path.join(relDir, `${baseName}-low${ext}`);
   const mediumRel = path.join(relDir, `${baseName}-med${ext}`);
   const lqipAbs = path.join(optimizedRoot, lqipRel);
+  const lowAbs = path.join(optimizedRoot, lowRel);
   const mediumAbs = path.join(optimizedRoot, mediumRel);
 
-  return { lqipAbs, mediumAbs, lqipRel, mediumRel };
+  return { lqipAbs, lowAbs, mediumAbs, lqipRel, lowRel, mediumRel };
 }
 
 async function needsBuild(src, out) {
@@ -95,9 +99,18 @@ async function processImage(srcAbsPath) {
   const ext = path.extname(srcAbsPath).toLowerCase();
   if (!allowedExtensions.has(ext)) return;
 
-  const { lqipAbs, mediumAbs, lqipRel, mediumRel } = buildOutputs(srcAbsPath);
+  const { lqipAbs, lowAbs, mediumAbs, lqipRel, lowRel, mediumRel } = buildOutputs(srcAbsPath);
+  const baseFileName = path.basename(srcAbsPath);
+
+  // Files used in the WelcomeScreen center container should skip LQIP and LOW
+  const SKIP_LQIP_LOW = new Set([
+    'COW_white_heart.png',
+    'COW_Red_heart_Explore.png',
+    'BeepingHeart.png',
+  ]);
 
   await ensureDir(path.dirname(lqipAbs));
+  await ensureDir(path.dirname(lowAbs));
   await ensureDir(path.dirname(mediumAbs));
 
   let metadata;
@@ -110,9 +123,10 @@ async function processImage(srcAbsPath) {
 
   const srcWidth = metadata.width || 0;
   const mediumWidth = Math.min(MEDIUM_WIDTH, srcWidth || MEDIUM_WIDTH);
+  const lowWidth = Math.min(LOW_WIDTH, srcWidth || LOW_WIDTH);
 
   // LQIP
-  if (await needsBuild(srcAbsPath, lqipAbs)) {
+  if (!SKIP_LQIP_LOW.has(baseFileName) && (await needsBuild(srcAbsPath, lqipAbs))) {
     try {
       await sharp(srcAbsPath)
         .resize({ width: LQIP_WIDTH, withoutEnlargement: true })
@@ -122,6 +136,25 @@ async function processImage(srcAbsPath) {
       console.log(`[lqip] ${path.relative(projectRoot, lqipAbs)} from ${path.relative(projectRoot, srcAbsPath)}`);
     } catch (e) {
       console.warn(`[fail:lqip] ${srcAbsPath}: ${e.message}`);
+    }
+  }
+
+  // LOW (keep original format)
+  if (!SKIP_LQIP_LOW.has(baseFileName) && (await needsBuild(srcAbsPath, lowAbs))) {
+    try {
+      const base = sharp(srcAbsPath).resize({ width: lowWidth, withoutEnlargement: true });
+      if (ext === '.png') {
+        await base
+          .png({ compressionLevel: 9, palette: true, effort: 10, quality: 60 })
+          .toFile(lowAbs);
+      } else {
+        await base
+          .jpeg({ quality: 60, mozjpeg: true })
+          .toFile(lowAbs);
+      }
+      console.log(`[low]  ${path.relative(projectRoot, lowAbs)} from ${path.relative(projectRoot, srcAbsPath)}`);
+    } catch (e) {
+      console.warn(`[fail:low] ${srcAbsPath}: ${e.message}`);
     }
   }
 

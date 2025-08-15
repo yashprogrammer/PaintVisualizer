@@ -51,21 +51,134 @@ const CitySelector = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Ensure the page body has a black background while this view is active
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const previousBackgroundColor = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = 'gray';
+    return () => {
+      document.body.style.backgroundColor = previousBackgroundColor;
+    };
+  }, []);
+
   const clampNumber = (min, value, max) => Math.min(max, Math.max(min, value));
   // Build optimized URLs for src/srcSet
   const buildOptimized = (src) => {
-    if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+    if (!src || typeof src !== 'string') return { lqip: src, low: src, medium: src, original: src };
     const lastDot = src.lastIndexOf('.');
-    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, low: `/optimized${src}-low`, medium: `/optimized${src}-med`, original: src };
     const base = src.substring(0, lastDot);
     const ext = src.substring(lastDot);
     return {
       lqip: `/optimized${base}-lqip.jpg`,
+      low: `/optimized${base}-low${ext}`,
       medium: `/optimized${base}-med${ext}`,
       original: src,
     };
   };
   const mediumOnly = (src) => src ? `/optimized${src.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}` : src;
+
+  // Preload blurred backgrounds for adjacent cities (prev/next) to speed up transitions
+  useEffect(() => {
+    if (!Array.isArray(cities) || cities.length === 0) return;
+    const prevIndex = (selectedIndex - 1 + cities.length) % cities.length;
+    const nextIndex = (selectedIndex + 1) % cities.length;
+
+    const preloadBlurred = (src) => {
+      if (!src) return;
+      const { lqip, low, medium, original } = buildOptimized(src);
+      const i1 = new Image(); i1.src = lqip;
+      const i1b = new Image(); i1b.src = low;
+      const i2 = new Image(); i2.src = medium;
+      const i3 = new Image(); i3.src = original;
+    };
+
+    preloadBlurred(cities[prevIndex]?.blurredImage);
+    preloadBlurred(cities[nextIndex]?.blurredImage);
+  }, [selectedIndex]);
+
+  // Progressive LQIP -> Low -> Medium -> Original for blurred background (delay upgrades until fade-in completes)
+  const ProgressiveBg = ({ image, styles, activateAfterMs = 700 }) => {
+    const { lqip, low, medium, original } = buildOptimized(image);
+    const [src, setSrc] = useState(lqip);
+    const [canUpgrade, setCanUpgrade] = useState(false);
+    const readyRef = useRef({ low: false, medium: false, original: false });
+    const canUpgradeRef = useRef(false);
+
+    useEffect(() => {
+      let cancelled = false;
+      setSrc(lqip);
+      setCanUpgrade(false);
+      canUpgradeRef.current = false;
+      readyRef.current = { low: false, medium: false, original: false };
+
+      // Preload low, medium, and original immediately
+      const lowImg = new Image();
+      lowImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.low = true;
+        if (canUpgradeRef.current && src === lqip) setSrc(low);
+      };
+      lowImg.src = low;
+
+      const medImg = new Image();
+      medImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.medium = true;
+        if (canUpgradeRef.current) setSrc((prev) => (prev === original ? prev : medium));
+      };
+      medImg.src = medium;
+
+      const fullImg = new Image();
+      fullImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.original = true;
+        if (canUpgradeRef.current) setSrc(original);
+      };
+      fullImg.src = original;
+
+      // Allow upgrades after fade-in completes
+      const t = setTimeout(() => {
+        if (cancelled) return;
+        canUpgradeRef.current = true;
+        setCanUpgrade(true);
+        if (readyRef.current.original) {
+          setSrc(original);
+        } else if (readyRef.current.medium) {
+          setSrc(medium);
+        } else if (readyRef.current.low) {
+          setSrc(low);
+        }
+      }, activateAfterMs);
+
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }, [image, lqip, low, medium, original, activateAfterMs]);
+
+    // Once upgrades are allowed, continue stepping up quality as images become available
+    useEffect(() => {
+      if (!canUpgrade) return;
+      if (readyRef.current.original) {
+        setSrc(original);
+      } else if (readyRef.current.medium && src !== medium) {
+        setSrc(medium);
+      } else if (readyRef.current.low && src === lqip) {
+        setSrc(low);
+      }
+    }, [canUpgrade, src, lqip, low, medium, original]);
+
+    return (
+      <animated.img
+        src={src}
+        alt="Background"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ ...styles, transform: 'scale(1)' }}
+        decoding="async"
+      />
+    );
+  };
 
   // Derived responsive metrics
   const heartSizePx = clampNumber(320, Math.min(viewportWidth, viewportHeight) * 1, 1600);
@@ -352,20 +465,18 @@ const CitySelector = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
       {bgTransitions((styles, item) => (
-        <animated.img
-          key={item}
-          src={buildOptimized(item).medium}
-          srcSet={`${buildOptimized(item).lqip} 20w, ${buildOptimized(item).medium} 800w, ${buildOptimized(item).original} 1600w`}
-          sizes="100vw"
-          alt="Background"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ ...styles, transform: 'scale(1)' }}
-          decoding="async"
-        />
+        <ProgressiveBg key={item} image={item} styles={styles} activateAfterMs={700} />
       ))}
       
       {/* Overlay */}
-      <img src="/Overlay.png" alt="Overlay" className="absolute inset-0 w-full h-full object-cover" />
+      <img
+        src={buildOptimized('/Overlay.png').medium}
+        srcSet={`${buildOptimized('/Overlay.png').lqip} 20w, ${buildOptimized('/Overlay.png').medium} 800w, /Overlay.png 1600w`}
+        sizes="100vw"
+        alt="Overlay"
+        className="absolute inset-0 w-full h-full object-cover"
+        decoding="async"
+      />
 
       <div className="absolute z-20" style={{ top: `${logoTopPx}px`, right: `${logoRightPx}px` }}>
         <img src='/Dulux.png' alt="Colours of the World" style={{ width: `${logoWidthPx}px` }}/>
@@ -647,7 +758,7 @@ const CitySelector = () => {
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{
-                backgroundImage: `url(${selectedCity.image})`,
+                backgroundImage: `url(${mediumOnly(selectedCity.image)})`,
                 width: `${fanWidth}px`,
                 height: `${fanHeight}px`,
                 clipPath: `path("${fanPath}")`
