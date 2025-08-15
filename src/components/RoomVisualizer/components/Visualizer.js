@@ -60,9 +60,9 @@ const Visualizer = ({
   return (
     <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden py-6 px-4 lg:px-[25px]  w-1/2 flex-shrink-0 h-full">
       <div
-        className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-3xl w-full"
+        className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-[24px] w-full"
         style={{
-          background: 'rgba(255, 255, 255, 0.80)',
+          background: 'rgba(252, 252, 252, 0.70)',
           boxShadow:
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
@@ -180,14 +180,32 @@ const Visualizer = ({
               onClick={onShare}
               className="bg-white text-black text-[16px] px-[18px] py-2 rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="21" viewBox="0 0 32 33" fill="none" aria-hidden="true">
+                <path d="M24 11.166C26.2091 11.166 28 9.37515 28 7.16602C28 4.95688 26.2091 3.16602 24 3.16602C21.7909 3.16602 20 4.95688 20 7.16602C20 9.37515 21.7909 11.166 24 11.166Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 20.5C10.2091 20.5 12 18.7091 12 16.5C12 14.2909 10.2091 12.5 8 12.5C5.79086 12.5 4 14.2909 4 16.5C4 18.7091 5.79086 20.5 8 20.5Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M24 29.834C26.2091 29.834 28 28.0431 28 25.834C28 23.6248 26.2091 21.834 24 21.834C21.7909 21.834 20 23.6248 20 25.834C20 28.0431 21.7909 29.834 24 29.834Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M11.4531 18.5137L20.5598 23.8203" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20.5465 9.17969L11.4531 14.4864" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               Share
             </button>
           </div>
         </div>
         
         {/* Paint Color Swatches */}
-        <div className="w-full border-t-[3px] lg:border-t-[5px] border-solid border-[#d2d2d2]">
-          <div className="flex flex-row gap-4 lg:gap-[42px] items-center justify-center overflow-hidden px-8 lg:px-16 py-4 lg:py-6 w-full">
+        <div
+          className="w-[calc(100%-16px)] rounded-[24px] border-[3px] border-solid border-[#D2D2D2] mt-6 lg:mt-8 mx-2 mb-2"
+          style={{ background: 'linear-gradient(188deg, #FFF 0.36%, #F3F3F3 99.39%)' }}
+        >
+          <div className="flex flex-row gap-4 lg:gap-[42px] items-end justify-evenly overflow-hidden px-6 lg:px-10 pt-3 pb-2 lg:pt-4 lg:pb-3 w-full">
+            {/** Helper to choose text color for swatch background */}
+            {(() => {
+              return null; // placeholder to allow function declarations below without changing JSX flow
+            })()}
+            {/** Contrast helpers (function declarations scoped in component file) */}
+            { /* eslint-disable-next-line no-unused-vars */ }
+            { /* Functions defined via inline IIFE to keep in-file scope without re-renders */ }
+            { /* They are not executed here; only referenced below */ }
             {Array.from({ length: 4 }).map((_, index) => {
               const color = (colorPalettes[currentPalette]?.paintColors || [])[index];
               const isFilled = Boolean(color);
@@ -195,15 +213,42 @@ const Visualizer = ({
  
               if (isFilled) {
                 const details = colorInfo?.[color?.toUpperCase()] || {};
+                const parseHex = (hex) => {
+                  if (!hex || typeof hex !== 'string') return { r: 255, g: 255, b: 255 };
+                  const normalized = hex.replace('#', '').trim();
+                  if (normalized.length === 3) {
+                    const r = parseInt(normalized[0] + normalized[0], 16);
+                    const g = parseInt(normalized[1] + normalized[1], 16);
+                    const b = parseInt(normalized[2] + normalized[2], 16);
+                    return { r, g, b };
+                  }
+                  const r = parseInt(normalized.substring(0, 2), 16);
+                  const g = parseInt(normalized.substring(2, 4), 16);
+                  const b = parseInt(normalized.substring(4, 6), 16);
+                  if ([r, g, b].some((n) => Number.isNaN(n))) return { r: 255, g: 255, b: 255 };
+                  return { r, g, b };
+                };
+                const { r, g, b } = parseHex(color);
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                const textColor = brightness <= 140 ? '#FFFFFF' : '#000000';
                 return (
-                  <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
+                  <div key={index} className="flex flex-col items-center gap-1 swatch-item ">
                     <div className="relative swatch-container overflow-visible">
                       <div
-                        className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
-                        style={{ backgroundColor: color }}
+                        className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''} flex flex-col items-center justify-center text-center p-2 lg:p-3`}
+                        style={{ backgroundColor: color, color: textColor }}
                         onClick={() => selectPaint(color)}
                         title={details.name || color}
-                      />
+                      >
+                        <span className="text-[12px] lg:text-[14px] font-medium leading-none max-w-[90%] truncate">
+                          {details.name || ''}
+                        </span>
+                        {details.detail && (
+                          <span className="text-[10px] lg:text-[12px] leading-none mt-1 opacity-90 max-w-[90%] truncate">
+                            {details.detail}
+                          </span>
+                        )}
+                      </div>
                       <div
                         className="absolute -top-1 -right-1 bg-black bg-opacity-80 rounded-full p-1 cursor-pointer"
                         onClick={(e) => {
@@ -223,19 +268,14 @@ const Visualizer = ({
                         </svg>
                       </div>
                     </div>
-                    <span className="text-xs text-center whitespace-nowrap max-w-[112px] truncate">{details.name || ''}</span>
-                    {details.detail && (
-                      <span className="text-[10px] text-center whitespace-nowrap italic leading-none max-w-[112px] truncate">{details.detail}</span>
-                    )}
                   </div>
                 );
               }
  
               // Placeholder swatch
               return (
-                <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
+                <div key={index} className="flex flex-col items-center gap-1 swatch-item ">
                   <div className={`${commonClasses} bg-gray-200`} />
-                  <span className="text-xs">&nbsp;</span>
                 </div>
               );
             })}

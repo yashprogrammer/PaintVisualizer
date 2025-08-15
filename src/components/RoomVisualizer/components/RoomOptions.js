@@ -20,7 +20,7 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
         }}
       >
         {/* Room Options Area */}
-        <div className="flex-1 flex flex-col items-center justify-start overflow-hidden  pt-4 lg:pt-6 px-4 lg:px-[18px] w-full min-h-0">
+        <div className="flex-1 flex flex-col items-center justify-start overflow-hidden  pt-4 lg:pt-6 px-4 lg:px-[18px] w-full min-h-0 max-h-[95vh]">
           {/* Header section with title */}
           <div className="flex flex-col px-0 lg:px-2 pt-0 pb-3 lg:pb-4 w-full">
             <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-end font-brand mb-3">
