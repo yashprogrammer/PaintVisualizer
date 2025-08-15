@@ -1,6 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../services/api';
+
+// Build optimized asset paths for low/medium/original given a public image path
+const buildOptimizedPath = (src) => {
+  if (!src || typeof src !== 'string') {
+    return { low: src, medium: src, original: src };
+  }
+  const lastDot = src.lastIndexOf('.');
+  if (lastDot === -1) {
+    return {
+      low: `/optimized${src}-low`,
+      medium: `/optimized${src}-med`,
+      original: src,
+    };
+  }
+  const base = src.substring(0, lastDot);
+  const ext = src.substring(lastDot);
+  return {
+    low: `/optimized${base}-low${ext}`,
+    medium: `/optimized${base}-med${ext}`,
+    original: src,
+  };
+};
+
+// Progressive loader: low -> medium -> original
+const ProgressiveHotspotImage = ({ image, alt, className, style, onReady, onError }) => {
+  const { low, medium, original } = buildOptimizedPath(image);
+  const [src, setSrc] = useState(low);
+  const readyFiredRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSrc(low);
+    readyFiredRef.current = false;
+
+    // Preload low, then medium, then original
+    const lowImg = new Image();
+    lowImg.onload = () => {
+      if (cancelled) return;
+      // Ensure we show at least low immediately
+      setSrc((prev) => (prev === low ? prev : low));
+      if (!readyFiredRef.current && typeof onReady === 'function') {
+        readyFiredRef.current = true;
+        onReady();
+      }
+    };
+    lowImg.onerror = () => { if (!cancelled && typeof onError === 'function') onError(); };
+    lowImg.src = low;
+
+    const medImg = new Image();
+    medImg.onload = () => {
+      if (cancelled) return;
+      setSrc(medium);
+    };
+    medImg.src = medium;
+
+    const fullImg = new Image();
+    fullImg.onload = () => {
+      if (cancelled) return;
+      setSrc(original);
+    };
+    fullImg.src = original;
+
+    return () => { cancelled = true; };
+  }, [image, low, medium, original, onReady, onError]);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      style={style}
+      decoding="async"
+    />
+  );
+};
 
 const HotspotSelector = () => {
   const { city } = useParams();
@@ -132,7 +207,7 @@ const HotspotSelector = () => {
     navigate(`/visualizer/${city.toLowerCase()}/${hotspot.id}?color=${encodeURIComponent(hotspot.color)}&name=${encodeURIComponent(hotspot.name)}`);
   };
 
-  const handleImageLoad = () => {
+  const handleImageReady = () => {
     setImageLoaded(true);
   };
 
@@ -193,14 +268,14 @@ const HotspotSelector = () => {
           </div>
         </div>
       )}
-      {/* Background Image */}
+      {/* Background Image (progressive: low -> medium -> original) */}
       <div className="absolute inset-0">
         {cityData?.hotspotImage && (
-          <img 
-            src={cityData.hotspotImage}
+          <ProgressiveHotspotImage
+            image={cityData.hotspotImage}
             alt={`${cityData.name} hotspot selection`}
             className="w-full h-full object-cover"
-            onLoad={handleImageLoad}
+            onReady={handleImageReady}
             onError={handleImageError}
             style={{
               opacity: imageLoaded ? 1 : 0,
