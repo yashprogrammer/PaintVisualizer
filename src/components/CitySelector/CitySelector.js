@@ -34,6 +34,171 @@ const CitySelector = () => {
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Loading...');
 
+  // Viewport-aware responsive sizing
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== 'undefined' ? window.innerHeight : 720
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Ensure the page body has a black background while this view is active
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const previousBackgroundColor = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = 'gray';
+    return () => {
+      document.body.style.backgroundColor = previousBackgroundColor;
+    };
+  }, []);
+
+  const clampNumber = (min, value, max) => Math.min(max, Math.max(min, value));
+  // Build optimized URLs for src/srcSet
+  const buildOptimized = (src) => {
+    if (!src || typeof src !== 'string') return { lqip: src, low: src, medium: src, original: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, low: `/optimized${src}-low`, medium: `/optimized${src}-med`, original: src };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      lqip: `/optimized${base}-lqip.jpg`,
+      low: `/optimized${base}-low${ext}`,
+      medium: `/optimized${base}-med${ext}`,
+      original: src,
+    };
+  };
+  const mediumOnly = (src) => src ? `/optimized${src.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}` : src;
+
+  // Preload blurred backgrounds for adjacent cities (prev/next) to speed up transitions
+  useEffect(() => {
+    if (!Array.isArray(cities) || cities.length === 0) return;
+    const prevIndex = (selectedIndex - 1 + cities.length) % cities.length;
+    const nextIndex = (selectedIndex + 1) % cities.length;
+
+    const preloadBlurred = (src) => {
+      if (!src) return;
+      const { lqip, low, medium, original } = buildOptimized(src);
+      const i1 = new Image(); i1.src = lqip;
+      const i1b = new Image(); i1b.src = low;
+      const i2 = new Image(); i2.src = medium;
+      const i3 = new Image(); i3.src = original;
+    };
+
+    preloadBlurred(cities[prevIndex]?.blurredImage);
+    preloadBlurred(cities[nextIndex]?.blurredImage);
+  }, [selectedIndex]);
+
+  // Progressive LQIP -> Low -> Medium -> Original for blurred background (delay upgrades until fade-in completes)
+  const ProgressiveBg = ({ image, styles, activateAfterMs = 700 }) => {
+    const { lqip, low, medium, original } = buildOptimized(image);
+    const [src, setSrc] = useState(lqip);
+    const [canUpgrade, setCanUpgrade] = useState(false);
+    const readyRef = useRef({ low: false, medium: false, original: false });
+    const canUpgradeRef = useRef(false);
+
+    useEffect(() => {
+      let cancelled = false;
+      setSrc(lqip);
+      setCanUpgrade(false);
+      canUpgradeRef.current = false;
+      readyRef.current = { low: false, medium: false, original: false };
+
+      // Preload low, medium, and original immediately
+      const lowImg = new Image();
+      lowImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.low = true;
+        if (canUpgradeRef.current && src === lqip) setSrc(low);
+      };
+      lowImg.src = low;
+
+      const medImg = new Image();
+      medImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.medium = true;
+        if (canUpgradeRef.current) setSrc((prev) => (prev === original ? prev : medium));
+      };
+      medImg.src = medium;
+
+      const fullImg = new Image();
+      fullImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.original = true;
+        if (canUpgradeRef.current) setSrc(original);
+      };
+      fullImg.src = original;
+
+      // Allow upgrades after fade-in completes
+      const t = setTimeout(() => {
+        if (cancelled) return;
+        canUpgradeRef.current = true;
+        setCanUpgrade(true);
+        if (readyRef.current.original) {
+          setSrc(original);
+        } else if (readyRef.current.medium) {
+          setSrc(medium);
+        } else if (readyRef.current.low) {
+          setSrc(low);
+        }
+      }, activateAfterMs);
+
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }, [image, lqip, low, medium, original, activateAfterMs]);
+
+    // Once upgrades are allowed, continue stepping up quality as images become available
+    useEffect(() => {
+      if (!canUpgrade) return;
+      if (readyRef.current.original) {
+        setSrc(original);
+      } else if (readyRef.current.medium && src !== medium) {
+        setSrc(medium);
+      } else if (readyRef.current.low && src === lqip) {
+        setSrc(low);
+      }
+    }, [canUpgrade, src, lqip, low, medium, original]);
+
+    return (
+      <animated.img
+        src={src}
+        alt="Background"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ ...styles, transform: 'scale(1)' }}
+        decoding="async"
+      />
+    );
+  };
+
+  // Derived responsive metrics
+  const heartSizePx = clampNumber(320, Math.min(viewportWidth, viewportHeight) * 1, 1600);
+  const fanWidth = clampNumber(180, viewportWidth * 0.18, 380);
+  const fanHeight = clampNumber(90, viewportWidth * 0.09, 190);
+  const fanPath = `M 0 ${fanHeight} A ${fanHeight} ${fanHeight}, 0, 0, 1, ${fanWidth} ${fanHeight} L ${fanWidth / 2} ${fanHeight} Z`;
+
+  // Typography scaling anchored to FHD look (heart size ~1080px at 1920x1080)
+  const BASE_HEART = 1080; // heart size at FHD with current sizing model
+  const baseCityFontPx = 104; // desired FHD heading size
+  const baseExploreFontPx = 32; // desired FHD subheading size
+  const heartScale = heartSizePx / BASE_HEART;
+  const cityFontPx = clampNumber(24, Math.round(baseCityFontPx * heartScale), 180);
+  const exploreFontPx = clampNumber(12, Math.round(baseExploreFontPx * heartScale), 72);
+
+  // Logo sizing responsive to both width and height
+  const logoWidthPx = clampNumber(64, Math.min(viewportWidth * 0.11, viewportHeight * 0.14), 220);
+  const logoTopPx = clampNumber(8, viewportHeight * 0.02, 32);
+  const logoRightPx = clampNumber(8, viewportWidth * 0.02, 40);
+
   // Retrieve preloaded video from localStorage if available
   const getVideoSource = (city) => {
     if (typeof window === 'undefined') return city.video;
@@ -43,8 +208,9 @@ const CitySelector = () => {
     return city.video;
   };
   // Text/panel are controlled via a one-shot transition keyed by displayed city
-  const itemWidth = typeof window !== 'undefined' ? (window.innerWidth / 4) : 375; // 1/4 of viewport width for 4 images
-  const itemHeight = 180; // Reduced height to make images more rectangular (16:9 aspect ratio)
+  // Responsive carousel sizing
+  const itemWidth = clampNumber(120, viewportWidth / 4, 520);
+  const itemHeight = Math.round(clampNumber(90, viewportHeight * 0.16, 240));
   const carouselRef = useRef(null);
   const videoRef = useRef(null);
   
@@ -92,7 +258,7 @@ const CitySelector = () => {
   };
 
   const onPointerDown = (e) => {
-    if (isTransitioning) return;
+    if (isTransitioning || isGlobalLoading) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return; // only primary button
     setIsDragging(true);
     const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
@@ -109,7 +275,7 @@ const CitySelector = () => {
   };
 
   const onPointerMove = (e) => {
-    if (!isDragging) return;
+    if (!isDragging || isGlobalLoading) return;
     const x = typeof e.clientX === 'number' ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : dragRef.current.lastX);
     const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const dx = x - dragRef.current.startX;
@@ -231,6 +397,7 @@ const CitySelector = () => {
   };
 
   const handleCityClick = async () => {
+    if (isGlobalLoading) return;
     const selectedCity = cities[selectedIndex];
     const cityKey = selectedCity.name.toLowerCase();
     setIsGlobalLoading(true);
@@ -250,7 +417,7 @@ const CitySelector = () => {
   };
 
   // Calculate translateX based on current position
-  const centerOffset = typeof window !== 'undefined' ? (window.innerWidth / 2) - (itemWidth / 2) : 0;
+  const centerOffset = (viewportWidth / 2) - (itemWidth / 2);
   const translateX = centerOffset - (virtualIndex * itemWidth);
 
   const selectedCity = cities[selectedIndex];
@@ -278,8 +445,10 @@ const CitySelector = () => {
   });
 
   // One-shot transition for text (from right) and panel (from left)
+  const slideTextX = clampNumber(80, viewportWidth * 0.18, 600);
+  const slidePanelX = -clampNumber(100, viewportWidth * 0.25, 800);
   const textPanelTransitions = useTransition(displayedCityIndex, {
-    from: { textX: 450, panelX: -600, opacity: 1 },
+    from: { textX: slideTextX, panelX: slidePanelX, opacity: 1 },
     enter: { textX: 0, panelX: 0, opacity: 1 },
     // We unmount old content instantly via showText gate
     config: { duration: 1200, easing: easings.easeInOutCubic },
@@ -297,20 +466,21 @@ const CitySelector = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
       {bgTransitions((styles, item) => (
-        <animated.img
-          key={item}
-          src={item}
-          alt="Background"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ ...styles, transform: 'scale(1)' }}
-        />
+        <ProgressiveBg key={item} image={item} styles={styles} activateAfterMs={700} />
       ))}
       
       {/* Overlay */}
-      <img src="/Overlay.png" alt="Overlay" className="absolute inset-0 w-full h-full object-cover" />
+      <img
+        src={buildOptimized('/Overlay.png').medium}
+        srcSet={`${buildOptimized('/Overlay.png').lqip} 20w, ${buildOptimized('/Overlay.png').medium} 800w, /Overlay.png 1600w`}
+        sizes="100vw"
+        alt="Overlay"
+        className="absolute inset-0 w-full h-full object-cover"
+        decoding="async"
+      />
 
-      <div className="absolute top-8 right-8 z-20">
-        <img src='/Dulux.png' alt="Colours of the World" className="w-28"/>
+      <div className="absolute z-20" style={{ top: `${logoTopPx}px`, right: `${logoRightPx}px` }}>
+        <img src='/Dulux.png' alt="Colours of the World" style={{ width: `${logoWidthPx}px` }}/>
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-white">
@@ -328,10 +498,8 @@ const CitySelector = () => {
               className="absolute z-20"
               style={{
                 ...heartAnimation,
-                width: '70vw',
-                height: '70vw',
-                maxWidth: '1400px',
-                maxHeight: '1400px',
+                width: `${heartSizePx}px`,
+                height: `${heartSizePx}px`,
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
@@ -400,9 +568,9 @@ const CitySelector = () => {
                         opacity: styles.opacity.to((val) => val * 0.8),
                         backgroundColor: 'rgba(255, 255, 255, 0.8)',
                         borderRadius: '4px',
-                        padding: '20px 80px',
-                        minWidth: '800px',
-                        minHeight: '150px',
+                        padding: `${clampNumber(12, viewportHeight * 0.015, 22)}px ${clampNumber(18, viewportWidth * 0.04, 80)}px`,
+                        width: `${clampNumber(260, viewportWidth * 0.6, 980)}px`,
+                        height: `${clampNumber(80, viewportHeight * 0.14, 200)}px`,
                         zIndex: -1,
                         pointerEvents: 'none',
                       }}
@@ -417,9 +585,9 @@ const CitySelector = () => {
                         opacity: styles.opacity.to((val) => val * 0.4),
                         backgroundColor: 'rgba(255, 255, 255, 0.4)',
                         borderRadius: '4px',
-                        padding: '20px 80px',
-                        minWidth: '800px',
-                        minHeight: '170px',
+                        padding: `${clampNumber(12, viewportHeight * 0.015, 22)}px ${clampNumber(18, viewportWidth * 0.04, 80)}px`,
+                        width: `${clampNumber(260, viewportWidth * 0.6, 980)}px`,
+                        height: `${clampNumber(90, viewportHeight * 0.16, 220)}px`,
                         zIndex: -2,
                         pointerEvents: 'none',
                       }}
@@ -439,10 +607,10 @@ const CitySelector = () => {
                       }}
                       className="cursor-pointer text-white flex flex-col items-center justify-center"
                     >
-                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: '6.2rem', maxHeight:'100px', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
+                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: `${cityFontPx}px`, lineHeight: 1, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
                         {cities[item].name.toUpperCase()}
                       </h1>
-                     <p className="font-light tracking-[0.3em] select-none text-gray-800 font-brand" style={{ fontSize: '2rem', textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
+                     <p className="font-light tracking-[0.3em] select-none text-gray-800 font-brand" style={{ fontSize: `${exploreFontPx}px`, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
                     </animated.div>
                   </div>
                 ))}
@@ -479,18 +647,18 @@ const CitySelector = () => {
               {/* Navigation buttons */}
               <button 
                 onClick={handlePrev} 
-                disabled={isTransitioning}
-                className="absolute left-8 text-white hover:text-white/80 transition text-4xl z-30 bg-black/30 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
-                style={{ fontSize: '24px' }}
+                disabled={isTransitioning || isGlobalLoading}
+                className="absolute text-white hover:text-white/80 transition z-30 bg-black/30 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
+                style={{ left: `${clampNumber(8, viewportWidth * 0.02, 48)}px`, top: '50%', transform: 'translateY(-50%)', width: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, height: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, fontSize: `${clampNumber(18, viewportWidth * 0.022, 26)}px` }}
               >
                 ←
               </button>
               
               <button 
                 onClick={handleNext} 
-                disabled={isTransitioning}
-                className="absolute right-8 text-white hover:text-white/80 transition text-4xl z-30 bg-black/30 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
-                style={{ fontSize: '24px' }}
+                disabled={isTransitioning || isGlobalLoading}
+                className="absolute text-white hover:text-white/80 transition z-30 bg-black/30 rounded-full flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
+                style={{ right: `${clampNumber(8, viewportWidth * 0.02, 48)}px`, top: '50%', transform: 'translateY(-50%)', width: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, height: `${clampNumber(28, viewportWidth * 0.03, 60)}px`, fontSize: `${clampNumber(18, viewportWidth * 0.022, 26)}px` }}
               >
                 →
               </button>
@@ -523,11 +691,11 @@ const CitySelector = () => {
                   // Sliding finished (let heart/text sequence control final state)
                   setTimeout(() => setIsTransitioning(false), 0);
                 }}
-                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isGlobalLoading ? 'cursor-wait' : (isDragging ? 'cursor-grabbing' : 'cursor-grab')}`}
                 style={{
                   transform: `translateX(${translateX + dragOffset}px)`,
                   width: `${extendedCities.length * itemWidth}px`,
-                  touchAction: 'pan-y',
+                  touchAction: isGlobalLoading ? 'none' : 'pan-y',
                 }}
               >
                 {extendedCities.map((city, index) => {
@@ -550,7 +718,9 @@ const CitySelector = () => {
                       }}
                     >
                       <img 
-                        src={city.image} 
+                        src={buildOptimized(city.image).medium}
+                        srcSet={`${buildOptimized(city.image).lqip} 20w, ${buildOptimized(city.image).medium} 800w, ${buildOptimized(city.image).original} 1600w`}
+                        sizes="50vw"
                         alt={city.name}
                         className={`w-full h-full px-[1px] object-cover transition-all duration-300 select-none ${
                           isSelected
@@ -565,6 +735,7 @@ const CitySelector = () => {
                           filter: 'grayscale(0.50)', // Add a little bit of grayscale
                         }}
                         draggable={false}
+                        decoding="async"
                       />
                     </div>
                   );
@@ -583,13 +754,15 @@ const CitySelector = () => {
               transform: 'translate(-50%, -50%)',
               zIndex: 5
             }}
-            className="w-72 h-36"
+            className=""
           >
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{
-                backgroundImage: `url(${selectedCity.image})`,
-                clipPath: 'path("M 0 150 A 150 150, 0, 0, 1, 300 150 L 150 150 Z")'
+                backgroundImage: `url(${mediumOnly(selectedCity.image)})`,
+                width: `${fanWidth}px`,
+                height: `${fanHeight}px`,
+                clipPath: `path("${fanPath}")`
               }}
             ></div>
           </animated.div>
@@ -598,15 +771,19 @@ const CitySelector = () => {
         {/* (Old city text overlay removed ‑ now integrated inside heart) */}
 
         {/* Instruction text with glass panel background */}
-        <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute left-1/2 transform -translate-x-1/2 z-10" style={{ bottom: `${clampNumber(10, viewportHeight * 0.05, 48)}px` }}>
           <div 
-            className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
+            className="bg-white backdrop-blur-md rounded-lg border-2 border-white shadow-lg"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.65)',
+              padding: `${clampNumber(6, viewportHeight * 0.012, 12)}px ${clampNumber(16, viewportWidth * 0.02, 32)}px`,
+            }}
           >
-           <p className="text-black text-xl font-bold tracking-widest text-center font-brand whitespace-nowrap">
+            <p className="text-black font-bold tracking-widest text-center font-brand"
+               style={{ fontSize: `${clampNumber(12, viewportWidth * 0.014, 20)}px`, whiteSpace: 'nowrap' }}>
               CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
             </p>
-          </div> 
+          </div>
         </div>
       </div>
 

@@ -9,6 +9,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "images:optimize": "node scripts/optimize-images.js",
     "images:webp": "node scripts/convert-to-webp.js",
     "images:webp:dry": "node scripts/convert-to-webp.js --dry"
   },

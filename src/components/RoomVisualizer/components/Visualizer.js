@@ -18,47 +18,176 @@ const Visualizer = ({
   onClearAreas,
   onShare
 }) => {
+  // Maintain base image aspect ratio on small viewports (landscape mobile)
+  const [baseAspectRatio, setBaseAspectRatio] = React.useState(null);
+  const baseImgRef = React.useRef(null);
+  // Landscape scaling (mobile) relative to FHD baseline
+  const [landscapeScale, setLandscapeScale] = React.useState(1);
+  React.useEffect(() => {
+    const BASE_WIDTH = 1920;
+    const BASE_HEIGHT = 1080;
+    const updateScale = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isLandscape = w > h;
+      const isMobile = w <= 1024;
+      if (isLandscape && isMobile) {
+        const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+        setLandscapeScale(s);
+      } else {
+        setLandscapeScale(1);
+      }
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('orientationchange', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      window.removeEventListener('orientationchange', updateScale);
+    };
+  }, []);
+
+  const handleBaseImgLoad = React.useCallback((e) => {
+    const nw = e?.target?.naturalWidth || baseImgRef.current?.naturalWidth;
+    const nh = e?.target?.naturalHeight || baseImgRef.current?.naturalHeight;
+    if (nw && nh) {
+      const ratio = nw / nh;
+      // Guard: cap to sensible bounds in case of corrupted dimensions
+      if (ratio > 0.3 && ratio < 5) setBaseAspectRatio(ratio);
+    }
+  }, []);
+
+  // Build optimized asset paths for src/srcSet
+  const buildOptimized = React.useCallback((src) => {
+    if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      lqip: `/optimized${base}-lqip.jpg`,
+      medium: `/optimized${base}-med${ext}`,
+      original: src,
+    };
+  }, []);
+
   return (
-    <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden px-4 lg:px-[25px]  w-1/2 flex-shrink-0 h-full">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-center w-full font-brand">
-        <p className="block leading-normal">Visualizer</p>
-      </div>
+    <div className="visualizer-column column-2 column-padding flex flex-col items-center justify-start overflow-visible px-4 lg:px-[25px]  w-1/2 flex-shrink-0 min-h-[80vh] max-h-[95vh]">
       <div
-        className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-3xl w-full"
+        className="container-height flex flex-col gap-0 lg:gap-[21px] items-center justify-start relative rounded-[24px] w-full"
         style={{
-          background: 'rgba(255, 255, 255, 0.80)',
+          background: 'rgba(252, 252, 252, 0.70)',
           boxShadow:
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
       >
-        
+        <style jsx>{`
+          /* Always keep the visualizer box constrained by the base image aspect ratio */
+          .visualizer-aspect {
+            width: 100%;
+            aspect-ratio: var(--vr, 16/9);
+          }
+          .visualizer-aspect > .visualizer-box {
+            height: 100% !important;
+          }
+          /* Responsive swatch sizing and padding so swatches don't squeeze the image */
+          .swatch-size {
+            width: clamp(30px, 9.2vw, 112px);
+            aspect-ratio: 1 / 1;
+          }
+          .swatch-pad {
+            padding: clamp(3px, 1.1vw, 6px);
+          }
+          /* Share button responsive sizing */
+          .share-btn {
+            font-size: clamp(12px, 1.4vmin, 16px);
+            padding: clamp(6px, 0.9vmin, 10px) clamp(10px, 1.4vmin, 14px);
+            border-radius: 12px;
+          }
+          .share-btn svg {
+            width: clamp(14px, 1.8vmin, 20px);
+            height: clamp(14px, 1.8vmin, 20px);
+          }
+          /* Mobile landscape: slightly reduce code text size on selected swatch */
+          @media (max-width: 1024px) and (orientation: landscape) {
+            /* Hide the Visualizer title on mobile landscape (scoped to this column only) */
+            .visualizer-column .title-text {
+              display: none !important;
+            }
+            .paint-swatch.selected-color .swatch-code {
+              font-size: clamp(6px, 1.6vw, 11px) !important;
+            }
+            /* Make swatches much smaller on mobile landscape */
+            .swatch-size {
+              width: clamp(60px, 2.8vmin, 100px);
+            }
+            .swatch-pad {
+              padding: clamp(1px, 0.6vmin, 3px);
+            }
+            /* Hide text to avoid overflow in tiny swatches */
+            .paint-swatch .swatch-name,
+            .paint-swatch .swatch-code {
+              display: none;
+            }
+            /* Smaller share button on landscape mobile */
+            .share-btn {
+              font-size: clamp(9px, 1.4vw, 11px);
+              padding: 4px 8px;
+            }
+            .share-btn svg {
+              width: clamp(12px, 1.8vw, 14px) !important;
+              height: clamp(12px, 1.8vw, 14px) !important;
+            }
+          }
+        `}</style>
         {/* Room Visualization Area */}
-        <div className="flex-1 flex flex-col gap-2.5 items-center justify-center overflow-hidden pb-0 pt-4 lg:pt-8 px-4 lg:px-[18px] w-full min-h-0">
-          <div 
-            ref={containerRef}
-            className="flex-1 w-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
-            onClick={handleCanvasClick}
-          >
+        <div className="flex flex-col gap-2.5 items-center justify-start overflow-hidden pb-0 pt-2 lg:pt-4 px-4 lg:px-[18px] w-full min-h-0">
+          {/* Header section with title */}
+          <div className="flex flex-col px-0 lg:px-2 pt-0 pb-1 lg:pb-2 w-full">
+            <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-center font-brand mb-0 lg:mb-3">
+              <p className="block leading-normal">Visualizer</p>
+            </div>
+          
+          </div>
+          {/* Ratio wrapper (driven by base image aspect ratio) */}
+          <div className="visualizer-aspect w-full" style={{ ['--vr']: baseAspectRatio || 1.6 }}>
+            <div 
+              ref={containerRef}
+              className="visualizer-box w-full h-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
+              onClick={handleCanvasClick}
+            >
             {/* Clear Areas pill */}
-            <div className="absolute top-6 right-6 bg-white text-black px-3 py-2 rounded-lg flex items-center gap-2 shadow-sm z-[200]">
+            <div className="absolute bg-white text-black rounded-lg flex items-center gap-2 shadow-sm z-[200]"
+                 style={{ top: `${Math.round(24 * landscapeScale)}px`, right: `${Math.round(24 * landscapeScale)}px`, padding: `${Math.max(1, Math.round(8 * landscapeScale))}px ${Math.max(4, Math.round(12 * landscapeScale))}px` }}>
               <button
                 type="button"
-                className="text-[12px] font-medium"
+                className="font-medium flex items-center gap-2"
+                style={{ fontSize: `${Math.max(10, Math.round(12 * landscapeScale))}px` }}
                 onClick={(e) => { e.stopPropagation(); onClearAreas && onClearAreas(); }}
               >
+                <svg xmlns="http://www.w3.org/2000/svg" width={Math.max(14, Math.round(16 * landscapeScale))} height={Math.max(14, Math.round(16 * landscapeScale))} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M20.9996 21.0001H7.99957C7.73587 21.0007 7.47465 20.9491 7.23095 20.8484C6.98725 20.7476 6.76588 20.5997 6.57957 20.4131L2.58557 16.4141C2.21063 16.039 2 15.5304 2 15.0001C2 14.4697 2.21063 13.9611 2.58557 13.5861L12.5856 3.58607C12.7713 3.40027 12.9918 3.25288 13.2345 3.15232C13.4772 3.05176 13.7374 3 14.0001 3C14.2628 3 14.5229 3.05176 14.7656 3.15232C15.0083 3.25288 15.2288 3.40027 15.4146 3.58607L21.4136 9.58607C21.7885 9.96113 21.9991 10.4697 21.9991 11.0001C21.9991 11.5304 21.7885 12.039 21.4136 12.4141L12.8336 21.0001" stroke="black" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5.08203 11.0898L13.91 19.9178" stroke="black" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 CLEAR AREAS
               </button>
             </div>
             {/* Base room image */}
             <img 
-              src={roomData[currentRoom].baseImage} 
+              src={buildOptimized(roomData[currentRoom].baseImage).medium}
+              srcSet={`${buildOptimized(roomData[currentRoom].baseImage).lqip} 20w, ${buildOptimized(roomData[currentRoom].baseImage).medium} 800w, ${buildOptimized(roomData[currentRoom].baseImage).original} 1600w`}
+              sizes="50vw"
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+              ref={baseImgRef}
+              onLoad={handleBaseImgLoad}
+              decoding="async"
+              draggable={false}
             />
             
             {/* Mask overlays for each surface */}
             {roomData[currentRoom].surfaces.map((surface, idx) => {
-              const maskLoaded = maskImagesRef.current[surface.id];
+              const loadedMask = maskImagesRef.current[surface.id];
               const isSelected = selectedSurface === surface.id;
               const surfaceColor = surfaceColors[surface.id];
 
@@ -67,8 +196,8 @@ const Visualizer = ({
 
               const styleObj = {
                 backgroundColor: surfaceColor ? surfaceColor : (isSelected ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.001)'),
-                maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
-                WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
                 maskSize: 'cover',
                 WebkitMaskSize: 'cover',
                 maskRepeat: 'no-repeat',
@@ -79,7 +208,7 @@ const Visualizer = ({
                 zIndex: isSelected ? 100 : idx + 1,
                 pointerEvents: 'none',
                 // Hide overlay if mask hasn't loaded to prevent full-image coloring
-                display: maskLoaded ? 'block' : 'none',
+                display: loadedMask ? 'block' : 'none',
                 transition: 'opacity 0.2s ease',
               };
 
@@ -103,47 +232,90 @@ const Visualizer = ({
               </div>
             )}
             
-            {/* Selection indicator */}
-            {selectedSurface && (
-              <div className="absolute top-6 left-6 bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium font-brand">
-                {roomData[currentRoom].surfaces.find(s => s.id === selectedSurface)?.name || selectedSurface}
-              </div>
-            )}
+            {/* Selection indicator (hidden intentionally) */}
             
       
-         
+            </div>
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand w-full flex items-center justify-between px-6">
             <p className="block leading-normal">Select surface to paint</p>
             <button
               type="button"
               onClick={onShare}
-              className="bg-white text-black text-[16px] px-[18px] py-2 rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50"
+              className="bg-white text-black rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50 share-btn"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 33" fill="none" aria-hidden="true">
+                <path d="M24 11.166C26.2091 11.166 28 9.37515 28 7.16602C28 4.95688 26.2091 3.16602 24 3.16602C21.7909 3.16602 20 4.95688 20 7.16602C20 9.37515 21.7909 11.166 24 11.166Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 20.5C10.2091 20.5 12 18.7091 12 16.5C12 14.2909 10.2091 12.5 8 12.5C5.79086 12.5 4 14.2909 4 16.5C4 18.7091 5.79086 20.5 8 20.5Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M24 29.834C26.2091 29.834 28 28.0431 28 25.834C28 23.6248 26.2091 21.834 24 21.834C21.7909 21.834 20 23.6248 20 25.834C20 28.0431 21.7909 29.834 24 29.834Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M11.4531 18.5137L20.5598 23.8203" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20.5465 9.17969L11.4531 14.4864" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               Share
             </button>
           </div>
         </div>
         
         {/* Paint Color Swatches */}
-        <div className="w-full border-t-[3px] lg:border-t-[5px] border-solid border-[#d2d2d2]">
-          <div className="flex flex-row gap-4 lg:gap-[42px] items-center justify-center overflow-hidden px-8 lg:px-16 py-4 lg:py-6 w-full">
+        <div
+          className="w-[calc(100%-16px)] rounded-[24px] border-[3px] border-solid border-[#D2D2D2] mt-3 lg:mt-4 mx-2 mb-2"
+          style={{ background: 'linear-gradient(188deg, #FFF 0.36%, #F3F3F3 99.39%)' }}
+        >
+          <div className="flex flex-row gap-4 lg:gap-[42px] items-end justify-evenly overflow-hidden px-6 lg:px-10 pt-3 pb-2 lg:pt-4 lg:pb-3 w-full min-h-0">
+            {/** Helper to choose text color for swatch background */}
+            {(() => {
+              return null; // placeholder to allow function declarations below without changing JSX flow
+            })()}
+            {/** Contrast helpers (function declarations scoped in component file) */}
+            { /* eslint-disable-next-line no-unused-vars */ }
+            { /* Functions defined via inline IIFE to keep in-file scope without re-renders */ }
+            { /* They are not executed here; only referenced below */ }
             {Array.from({ length: 4 }).map((_, index) => {
               const color = (colorPalettes[currentPalette]?.paintColors || [])[index];
               const isFilled = Boolean(color);
-              const commonClasses = 'aspect-square w-20 lg:w-28 rounded-bl-[16px] lg:rounded-bl-[24px] rounded-tr-[16px] lg:rounded-tr-[24px]';
+              const commonClasses = 'swatch-size rounded-bl-[16px] lg:rounded-bl-[24px] rounded-tr-[16px] lg:rounded-tr-[24px]';
  
               if (isFilled) {
                 const details = colorInfo?.[color?.toUpperCase()] || {};
+                const parseHex = (hex) => {
+                  if (!hex || typeof hex !== 'string') return { r: 255, g: 255, b: 255 };
+                  const normalized = hex.replace('#', '').trim();
+                  if (normalized.length === 3) {
+                    const r = parseInt(normalized[0] + normalized[0], 16);
+                    const g = parseInt(normalized[1] + normalized[1], 16);
+                    const b = parseInt(normalized[2] + normalized[2], 16);
+                    return { r, g, b };
+                  }
+                  const r = parseInt(normalized.substring(0, 2), 16);
+                  const g = parseInt(normalized.substring(2, 4), 16);
+                  const b = parseInt(normalized.substring(4, 6), 16);
+                  if ([r, g, b].some((n) => Number.isNaN(n))) return { r: 255, g: 255, b: 255 };
+                  return { r, g, b };
+                };
+                const { r, g, b } = parseHex(color);
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                const textColor = brightness <= 140 ? '#FFFFFF' : '#000000';
                 return (
-                  <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
+                  <div key={index} className="flex flex-col items-center gap-1 swatch-item ">
                     <div className="relative swatch-container overflow-visible">
                       <div
-                        className={`${commonClasses} cursor-pointer paint-swatch ${currentPaintColor === color ? 'selected-color' : ''}`}
-                        style={{ backgroundColor: color }}
+                        className={`${commonClasses} cursor-pointer paint-swatch swatch-pad ${currentPaintColor === color ? 'selected-color' : ''} flex flex-col items-center justify-center text-center`}
+                        style={{ backgroundColor: color, color: textColor }}
                         onClick={() => selectPaint(color)}
                         title={details.name || color}
-                      />
+                      >
+                        <span
+                          className="swatch-name font-medium leading-tight max-w-[90%] text-center text-[clamp(8px,2.6vw,10px)] break-words"
+                          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                        >
+                          {details.name || ''}
+                        </span>
+                        {details.detail && (
+                          <span className="swatch-code leading-none mt-1 opacity-90 max-w-[90%] text-center whitespace-nowrap text-[clamp(10px,2.2vw,12px)] overflow-hidden text-ellipsis">
+                            {details.detail}
+                          </span>
+                        )}
+                      </div>
                       <div
                         className="absolute -top-1 -right-1 bg-black bg-opacity-80 rounded-full p-1 cursor-pointer"
                         onClick={(e) => {
@@ -163,19 +335,14 @@ const Visualizer = ({
                         </svg>
                       </div>
                     </div>
-                    <span className="text-xs text-center whitespace-nowrap max-w-[112px] truncate">{details.name || ''}</span>
-                    {details.detail && (
-                      <span className="text-[10px] text-center whitespace-nowrap italic leading-none max-w-[112px] truncate">{details.detail}</span>
-                    )}
                   </div>
                 );
               }
  
               // Placeholder swatch
               return (
-                <div key={index} className="flex flex-col items-center gap-1 swatch-item min-h-[130px] lg:min-h-[160px]">
+                <div key={index} className="flex flex-col items-center gap-1 swatch-item ">
                   <div className={`${commonClasses} bg-gray-200`} />
-                  <span className="text-xs">&nbsp;</span>
                 </div>
               );
             })}

@@ -8,6 +8,114 @@ import { citiesData } from '../../data/cities';
 
 const cityImages = Object.values(citiesData).map((c) => `/City/${c.name} H Small.png`);
 
+// Helper for optimized image sources
+const buildOptimized = (src) => {
+  if (!src || typeof src !== 'string') return { lqip: src, low: src, medium: src, original: src };
+  const lastDot = src.lastIndexOf('.');
+  if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, low: `/optimized${src}-low`, medium: `/optimized${src}-med`, original: src };
+  const base = src.substring(0, lastDot);
+  const ext = src.substring(lastDot);
+  return {
+    lqip: `/optimized${base}-lqip.jpg`,
+    low: `/optimized${base}-low${ext}`,
+    medium: `/optimized${base}-med${ext}`,
+    original: src,
+  };
+};
+
+// Progressive image loader that displays LQIP → Low → Medium → Original
+// Props:
+// - startAt: 'lqip' | 'low' | 'medium' (default 'lqip') - where to start for the first paint
+// - canUpgrade: if false, holds at current quality and defers preloads
+// - enableBlur: apply small blur while upgrading (disable for transparent PNGs)
+const ProgressiveImage = ({
+  src,
+  alt,
+  className,
+  style,
+  loading = 'lazy',
+  canUpgrade = true,
+  startAt = 'lqip',
+  enableBlur = true,
+  onOriginalLoad,
+}) => {
+  const { lqip, low, medium, original } = buildOptimized(src);
+  const initialSrc = startAt === 'medium' ? medium : startAt === 'low' ? low : lqip;
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [isBlurred, setIsBlurred] = useState(enableBlur);
+  const onOriginalLoadRef = useRef(onOriginalLoad);
+  useEffect(() => { onOriginalLoadRef.current = onOriginalLoad; }, [onOriginalLoad]);
+
+  // Reset to starting quality when the source changes
+  useEffect(() => {
+    let cancelled = false;
+    const startSrc = startAt === 'medium' ? medium : startAt === 'low' ? low : lqip;
+    setCurrentSrc(startSrc);
+    setIsBlurred(enableBlur);
+
+    // If we cannot upgrade yet, stop here (we'll upgrade when canUpgrade flips true)
+    if (!canUpgrade) {
+      return () => { cancelled = true; };
+    }
+
+    const loadImage = (url, onSuccess) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      img.onload = () => { if (!cancelled) onSuccess && onSuccess(); };
+      img.onerror = () => { if (!cancelled) onSuccess && onSuccess('error'); };
+    };
+
+    const goOriginal = () => {
+      loadImage(original, () => {
+        if (cancelled) return;
+        setCurrentSrc(original);
+        if (enableBlur) {
+          setTimeout(() => { if (!cancelled) setIsBlurred(false); }, 120);
+        }
+        if (onOriginalLoadRef.current) onOriginalLoadRef.current();
+      });
+    };
+
+    const goMedium = () => {
+      loadImage(medium, () => {
+        if (cancelled) return;
+        setCurrentSrc(medium);
+        goOriginal();
+      });
+    };
+
+    const goLow = () => {
+      loadImage(low, () => {
+        if (cancelled) return;
+        setCurrentSrc(low);
+        goMedium();
+      });
+    };
+
+    if (startAt === 'medium') {
+      goOriginal();
+    } else if (startAt === 'low') {
+      goMedium();
+    } else {
+      goLow();
+    }
+
+    return () => { cancelled = true; };
+  }, [src, lqip, low, medium, original, canUpgrade, startAt, enableBlur]);
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={`${className} ${enableBlur && isBlurred ? 'blur-sm' : ''}`}
+      style={style}
+      loading={loading}
+      decoding="async"
+    />
+  );
+};
+
 const WelcomeScreen = () => {
   const contentRef = useRef(null);
   const taglineRef = useRef(null);
@@ -24,14 +132,32 @@ const WelcomeScreen = () => {
   const [currentTaglineText, setCurrentTaglineText] = useState("TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL.");
   const duration = 3000; // 3 seconds
   const loop = false;
+  // Base design reference (FHD)
+  const BASE_WIDTH = 1920;
+  const BASE_HEIGHT = 1080;
+  const [scale, setScale] = useState(1);
   const MIN_DISTANCE = 100; // Prevent hearts within 100px radius of existing hearts
   const HEART_SIZE = 48; // Heart icon dimensions (approx)
   const RESTRICTED_MARGIN = 20; // Additional margin around restricted areas
   const SEAM_MARGIN = 30; // Min distance from background image seams where hearts cannot spawn
   const POP_INTERVAL = 200; // ms between new popup hearts
   const MAX_POPUP_HEARTS = 80; // maximum number of popup hearts allowed on screen
+  // Animation speeds
+  const CAROUSEL_DURATION_S = 240; // slower drift to match original vw/s with 3 slides
+  const HEART_DRIFT_DISTANCE_VW = 6; // keep same drift distance
+  // For three slides, the container travels 200vw per cycle (from 0 to -200vw)
+  const HEART_DRIFT_DURATION_S = (CAROUSEL_DURATION_S * HEART_DRIFT_DISTANCE_VW) / 200; // match carousel vw/s
   // Randomize background carousel order once per mount
   const [carouselImages, setCarouselImages] = useState(cityImages);
+  // Render three images at a time for the drifting background
+  const [carouselIndices, setCarouselIndices] = useState(() => ({
+    first: 0,
+    second: cityImages.length > 1 ? 1 : 0,
+    third: cityImages.length > 2 ? 2 : (cityImages.length > 1 ? 1 : 0),
+  }));
+  // Gate background upgrades until center graphics reach original quality
+  const [centerOriginalCount, setCenterOriginalCount] = useState(0);
+  const centerReady = centerOriginalCount >= 2;
   useEffect(() => {
     const shuffled = [...cityImages];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -39,6 +165,42 @@ const WelcomeScreen = () => {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     setCarouselImages(shuffled);
+    // Reset three-slot indices after shuffling
+    setCarouselIndices({
+      first: 0,
+      second: shuffled.length > 1 ? 1 : 0,
+      third: shuffled.length > 2 ? 2 : (shuffled.length > 1 ? 1 : 0),
+    });
+  }, []);
+
+  // When animation completes (2nd image fully passed), restart with a fresh random order
+  const handleCarouselIteration = () => {
+    setCarouselImages((prev) => {
+      const shuffled = [...prev];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setCarouselIndices({
+        first: 0,
+        second: shuffled.length > 1 ? 1 : 0,
+        third: shuffled.length > 2 ? 2 : (shuffled.length > 1 ? 1 : 0),
+      });
+      return shuffled;
+    });
+  };
+
+  // Keep the FHD layout proportions across all viewports
+  useEffect(() => {
+    const handleResize = () => {
+      const w = typeof window !== 'undefined' ? window.innerWidth : BASE_WIDTH;
+      const h = typeof window !== 'undefined' ? window.innerHeight : BASE_HEIGHT;
+      const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+      setScale(s);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Preload raw countries data once when the welcome screen mounts. The ApiService handles
@@ -382,77 +544,131 @@ const WelcomeScreen = () => {
     <div className="h-screen w-screen overflow-hidden flex relative">
       {/* Background Layer - Carousel Container (z-index: 1) */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-[1]">
-        <div className="flex animate-carousel-drift">
-          {[...carouselImages, ...carouselImages].map((image, index) => (
-            <img
-              key={index}
-              src={image}
-              alt={`City ${index}`}
-              className="h-full object-cover"
-              style={{ width: 'auto', height: '100vh' }}
+        <div
+          className="flex animate-carousel-drift"
+          onAnimationIteration={handleCarouselIteration}
+          style={{ animationDuration: `${CAROUSEL_DURATION_S}s` }}
+        >
+          {/* First slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`first-${carouselIndices.first}`}
+              src={carouselImages[carouselIndices.first]}
+              alt={`City ${carouselIndices.first}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
             />
-          ))}
+          )}
+          {/* Second slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`second-${carouselIndices.second}`}
+              src={carouselImages[carouselIndices.second]}
+              alt={`City ${carouselIndices.second}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
+            />
+          )}
+          {/* Third slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`third-${carouselIndices.third}`}
+              src={carouselImages[carouselIndices.third]}
+              alt={`City ${carouselIndices.third}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
+            />
+          )}
         </div>
       </div>
 
       {/* Content Layer - Centered Content (z-index: 10) */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-[20]">
-        {/* Heart Animation Container */}
-        <div 
-          ref={contentRef}
-          className="bg-white bg-opacity-70 backdrop-blur-md rounded-2xl text-center cursor-pointer shadow-lg flex flex-col items-center gap-6"
-          onClick={handleNavigate}
+      <div className="absolute inset-0 flex items-center justify-center z-[20]">
+        {/* Scaled root sized to FHD, scaled to fit viewport */}
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: BASE_WIDTH, height: BASE_HEIGHT, transform: `scale(${scale})`, transformOrigin: 'center center' }}
         >
-          {/* Heart Loading Animation */}
-          <div className="relative w-[38rem] h-[20rem] flex items-center justify-center">
-            {/* White heart as base - inherits z-index from parent */}
-            <img 
-              src="/COW_white_heart.png" 
-              alt="White Heart" 
-              className="absolute w-full h-full object-contain"
-            />
-            
-            {/* Red heart with animated clip-path - inherits z-index from parent */}
-            <img 
-              src="/COW_Red_heart_Explore.png" 
-              alt="Red Heart" 
-              className="absolute w-full h-full object-contain"
-              style={{ 
-                clipPath: clipPathValue,
-                transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
-              }}
-            />
-
-            {/* Beeping overlay to attract attention once fill completes */}
-            {showBeepingOverlay && (
-              <img
-                src="/BeepingHeart.png"
-                alt="Tap to explore"
-                className="heartbeat-overlay object-contain"
-                style={{ zIndex: 50 }}
+          {/* Heart Animation Container */}
+          <div 
+            ref={contentRef}
+            className="bg-white bg-opacity-70 backdrop-blur-md rounded-2xl text-center cursor-pointer shadow-lg flex flex-col items-center gap-6"
+            onClick={handleNavigate}
+          >
+            {/* Heart Loading Animation */}
+            <div className="relative w-[38rem] h-[20rem] flex items-center justify-center">
+              {/* White heart as base - progressive */}
+              <ProgressiveImage 
+                src="/COW_white_heart.png" 
+                alt="White Heart" 
+                className="absolute w-full h-full object-contain"
+                loading="eager"
+                canUpgrade={true}
+                startAt="medium"
+                enableBlur={false}
+                onOriginalLoad={() => setCenterOriginalCount((c) => c + 1)}
               />
-            )}
-          </div>
-        </div>
+              
+              {/* Red heart with animated clip-path - progressive */}
+              <ProgressiveImage 
+                src="/COW_Red_heart_Explore.png" 
+                alt="Red Heart" 
+                className="absolute w-full h-full object-contain"
+                style={{ 
+                  clipPath: clipPathValue,
+                  transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
+                }}
+                loading="eager"
+                canUpgrade={true}
+                startAt="medium"
+                enableBlur={false}
+                onOriginalLoad={() => setCenterOriginalCount((c) => c + 1)}
+              />
 
-        {/* Tagline Container - explicit z-index for clarity */}
-        <div 
-          ref={taglineRef} 
-          className="absolute bottom-10 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.65)',
-            border: '2px solid rgba(255, 255, 255, 1.0)'
-          }}
-        >
-          <p 
-            className="text-black text-lg font-bold tracking-wider"
+              {/* Beeping overlay to attract attention once fill completes */}
+              {showBeepingOverlay && (
+                <ProgressiveImage
+                  src="/BeepingHeart.png"
+                  alt="Tap to explore"
+                  className="heartbeat-overlay object-contain"
+                  style={{ zIndex: 50 }}
+                  loading="eager"
+                  canUpgrade={true}
+                  startAt="medium"
+                  enableBlur={false}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Tagline Container - positioned within the scaled root */}
+          <div 
+            ref={taglineRef} 
+            className="absolute bottom-10 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]"
             style={{
-              opacity: taglineOpacity,
-              transition: 'opacity 0.3s ease-in-out'
+              backgroundColor: 'rgba(255, 255, 255, 0.65)',
+              border: '2px solid rgba(255, 255, 255, 1.0)'
             }}
           >
-            {currentTaglineText}
-          </p>
+            <p 
+              className="text-black text-lg font-bold tracking-wider"
+              style={{
+                opacity: taglineOpacity,
+                transition: 'opacity 0.3s ease-in-out'
+              }}
+            >
+              {currentTaglineText}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -465,7 +681,7 @@ const WelcomeScreen = () => {
             style={{
               left: heart.x,
               top: heart.y,
-              animation: 'heart-drift 7s linear forwards',
+              animation: `heart-drift ${HEART_DRIFT_DURATION_S}s linear forwards`,
               pointerEvents: 'none',
             }}
           >

@@ -144,6 +144,27 @@ const HotspotSelector = () => {
 
   // Error banner overlay instead of page swap
 
+  // Responsive styles for the tagline container to make it scale across viewports
+  const taglineStyles = {
+    wrapper: {
+      bottom: 'clamp(8px, 5vh, 64px)'
+    },
+    panel: {
+      backgroundColor: 'rgba(255, 255, 255, 0.65)',
+      padding: 'clamp(5px, 0.96vw, 11px) clamp(12px, 1.92vw, 32px)',
+      borderWidth: 'clamp(1px, 0.2vw, 2px)',
+      borderStyle: 'solid',
+      borderColor: '#ffffff',
+      borderRadius: 'clamp(8px, 0.96vw, 12px)',
+      maxWidth: '95vw',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+    },
+    text: {
+      fontSize: 'clamp(9px, 1.44vw, 20px)',
+      letterSpacing: 'clamp(0.032em, 0.12vw, 0.16em)'
+    }
+  };
+
   const hotspotsToRender = cityData?.hotspots
     ? ((filteredHotspots && filteredHotspots.length > 0)
       ? filteredHotspots
@@ -239,15 +260,18 @@ const HotspotSelector = () => {
       ))}
 
       {/* Instructions */}
-      <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
+      <div className="absolute left-1/2 transform -translate-x-1/2 z-10" style={taglineStyles.wrapper}>
         <div 
-          className="bg-white backdrop-blur-md rounded-lg px-8 py-2 border-2 border-white shadow-lg"
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }}
+          className="backdrop-blur-md rounded-lg shadow-lg"
+          style={taglineStyles.panel}
         >
-         <p className="text-black text-xl font-bold tracking-widest text-center font-brand">
+          <p 
+            className="text-black font-bold text-center font-brand whitespace-nowrap"
+            style={taglineStyles.text}
+          >
             TAP A PAINT TONE HOTSPOT TO CONTINUE
           </p>
-        </div> 
+        </div>
       </div>
 
       {/* Back Button */}
