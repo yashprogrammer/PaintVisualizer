@@ -542,22 +542,22 @@ const RoomVisualizer = () => {
         
         /* Responsive adjustments */
          @media (max-width: 1024px) {
+           /* Keep a 3-column row layout on small screens (landscape mobile) */
            .main-container {
-             flex-direction: column;
-             height: auto;
-             min-height: 100vh;
+             flex-direction: row;
+             height: 100vh;
            }
+           /* Preserve visible three columns; rely on existing fractional widths */
            .column-1, .column-2, .column-3 {
-             width: 100% !important;
              flex-shrink: 1 !important;
            }
-          .title-text {
-            font-size: 28px !important;
-          }
-          .container-height {
-            height: auto !important;
-            min-height: 400px;
-          }
+           .title-text {
+             font-size: 28px !important;
+           }
+           .container-height {
+             height: auto !important;
+             min-height: 300px;
+           }
         }
         
         @media (max-width: 768px) {
@@ -574,8 +574,19 @@ const RoomVisualizer = () => {
             padding: 20px !important;
           }
         }
+
+        /* Typography scaling from FHD baseline across all viewports */
+        .main-container {
+          /* Scale factor relative to 1920px width, clamped for mobile and 4K */
+          --vr-scale: clamp(0.42, calc(100vw / 1920), 2);
+        }
+        .title-text { font-size: calc(20px * var(--vr-scale)) !important; }
+        .vibrant-text { font-size: calc(40px * var(--vr-scale)) !important; }
+        .surface-text { font-size: calc(28px * var(--vr-scale)) !important; }
+        .room-name-label { font-size: calc(24px * var(--vr-scale)) !important; }
+        .subline-text { font-size: calc(12px * var(--vr-scale)) !important; }
       `}</style>
-      <div className="main-container flex flex-row items-center justify-start w-full h-full py-12 px-6 gap-6">
+      <div className="main-container flex flex-row items-center justify-start w-full h-full  ">
         <PaletteSelector
           currentPalette={currentPalette}
           selectPalette={selectPalette}

@@ -1,11 +1,39 @@
 import React from 'react';
 
-const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {}, cityName = '' }) => {
+const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {}, cityName = '', onBack = () => {} }) => {
   const [svgContent, setSvgContent] = React.useState({ 1: null, 2: null });
   const paletteRefs = { 1: React.useRef(null), 2: React.useRef(null) };
   const userInteractedRef = React.useRef(false);
   const timeoutsRef = React.useRef([]);
   const isAnimatingRef = React.useRef(false);
+  // Landscape scaling (mobile) relative to FHD baseline
+  const [landscapeScale, setLandscapeScale] = React.useState(1);
+  const [isLandscapeMobile, setIsLandscapeMobile] = React.useState(false);
+  React.useEffect(() => {
+    const BASE_WIDTH = 1920;
+    const BASE_HEIGHT = 1080;
+    const updateScale = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isLandscape = w > h;
+      const isMobile = w <= 1024;
+      if (isLandscape && isMobile) {
+        const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+        setLandscapeScale(s);
+        setIsLandscapeMobile(true);
+      } else {
+        setLandscapeScale(1);
+        setIsLandscapeMobile(false);
+      }
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('orientationchange', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      window.removeEventListener('orientationchange', updateScale);
+    };
+  }, []);
 
   // Utility to recolor an SVG string given an array of hex colors.
   const recolorSvg = (rawSvg, colors) => {
@@ -46,8 +74,8 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
         const vibrantColors = colorPalettes?.[1]?.colors || [];
         const calmColors = colorPalettes?.[2]?.colors || [];
         setSvgContent({
-          1: recolorSvg(coolSvgRaw, vibrantColors),
-          2: recolorSvg(vibrantSvgRaw, calmColors),
+          1: recolorSvg(vibrantSvgRaw, vibrantColors),
+          2: recolorSvg(coolSvgRaw, calmColors),
         });
       } catch (e) {
         console.error('Failed to load lock-up svgs:', e);
@@ -167,19 +195,21 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
 
   const renderPaletteSvg = (paletteId, altText) => {
     const html = svgContent[paletteId];
+    const svgScale = isLandscapeMobile ? .7 : landscapeScale;
     if (html) {
       return (
         <div
-          className="absolute inset-0 flex items-center justify-center"
+          className="absolute inset-0 flex items-center justify-center lockup-wrapper"
+          style={{ transform: `scale(${svgScale})`, transformOrigin: 'center' }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
     }
     // fallback while loading
     return (
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center lockup-wrapper" style={{ transform: `scale(${svgScale})`, transformOrigin: 'center' }}>
         <img
-          src={paletteId === 1 ? '/LockUpSvg/cool.svg' : '/LockUpSvg/vibrant.svg'}
+          src={paletteId === 1 ? '/LockUpSvg/vibrant.svg' : '/LockUpSvg/cool.svg'}
           alt={altText}
           className="w-full h-full max-w-[280px] max-h-[280px] opacity-30"
         />
@@ -207,15 +237,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
   };
 
   return (
-    <div className="column-1 column-padding flex flex-col gap-4 lg:gap-8 items-start justify-start overflow-hidden px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-left w-full font-brand">
-        <p className="block leading-normal">Color Lock UP</p>
-        {cityName ? (
-          <div className="mt-1 text-[#616161] text-[16px] lg:text-[20px] font-sans">
-            <p className="block leading-normal whitespace-pre">{cityName}</p>
-          </div>
-        ) : null}
-      </div>
+    <div className="column-1 column-padding flex flex-col items-start justify-start overflow-hidden py-6 px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
       <div
         className="container-height flex-1 relative rounded-3xl w-full"
         style={{
@@ -224,34 +246,91 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
       >
-        <div className="flex flex-col gap-6 lg:gap-12 h-full items-center justify-center overflow-hidden px-4 lg:px-14 py-2.5 relative w-full">
+        <div className="flex flex-col h-full overflow-hidden relative w-full">
+          
+          {/* Header section with title, city name, and back button */}
+          <div className="flex px-4 lg:px-6 pt-4 lg:pt-6 pb-3 lg:pb-4 relative">
+            <div className="flex items-center justify-center mr-3">
+              <button 
+                className="flex items-center justify-center w-8 h-8 lg:w-10 lg:h-10 transition-opacity hover:opacity-80"
+                style={{
+                  borderRadius: '100px',
+                  background: 'rgba(0, 0, 0, 0.60)',
+                  width: `${Math.max(28, Math.round(40 * landscapeScale))}px`,
+                  height: `${Math.max(28, Math.round(40 * landscapeScale))}px`
+                }}
+                onClick={onBack}
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="22" 
+                  height="22" 
+                  viewBox="0 0 22 22" 
+                  fill="none"
+                  style={{ width: `${Math.max(16, Math.round(22 * landscapeScale))}px`, height: `${Math.max(16, Math.round(22 * landscapeScale))}px` }}
+                >
+                  <path 
+                    d="M11 21L1 11L11 1" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                  <path 
+                    d="M21 11H1" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col flex-1">
+              <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-left font-brand mb-2" style={isLandscapeMobile ? { marginBottom: 4 } : {}}>
+                <p className="block leading-normal truncate">Color Lock UP</p>
+              </div>
+              {cityName ? (
+                <div className="text-[#616161] subline-text font-sans mb-3" style={isLandscapeMobile ? { marginBottom: 4 } : {}}>
+                  <p className="block leading-normal whitespace-pre" style={{ fontSize: `${Math.max(12, Math.round(16 * landscapeScale))}px`, lineHeight: 1.1 }}>{cityName}</p>
+                </div>
+              ) : null}
+            </div>
+            {/* Separator line extending to back button */}
+            <div className="absolute bottom-0 left-4 right-4 h-px bg-gray-200"></div>
+          </div>
+          
+          {/* Palettes section */}
+          <div className={`flex flex-col flex-1 overflow-hidden px-4 lg:px-12 pb-4 text-center lg:pb-6 ${isLandscapeMobile ? 'gap-0 items-stretch justify-between' : 'gap-4 lg:gap-8 items-center justify-center'}`}>
           
           {/* Palette 1 */}
-          <div className="flex flex-col gap-2.5 items-center justify-start w-full">
+          <div className={`flex center flex-col ${isLandscapeMobile ? 'flex-1 min-h-0 gap-0 items-stretch' : 'gap-2.5 items-center justify-end'} w-full`}>
             <div 
-              className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 1 ? 'selected-color' : ''}`}
+              className={`${isLandscapeMobile ? 'flex-1 min-h-0' : 'aspect-square'} overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 1 ? 'selected-color' : ''}`}
               onClick={handleContainerClick(1)}
               ref={paletteRefs[1]}
             >
-              {renderPaletteSvg(1, 'Cool Palette')}
+              {renderPaletteSvg(1, 'Vibrant Palette')}
             </div>
-            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap font-brand">
+            <div className="vibrant-text text-center font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '16px', lineHeight: 1 } : {}}>
               <p className="block leading-normal whitespace-pre">Vibrant</p>
             </div>
           </div>
           
+          
           {/* Palette 2 */}
-          <div className="flex flex-col gap-2.5 items-center justify-start w-full">
+          <div className={`flex flex-col ${isLandscapeMobile ? 'flex-1 min-h-0 gap-0 items-stretch' : 'gap-2.5 items-center justify-start'} w-full`} >
             <div 
-              className={`aspect-square overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 2 ? 'selected-color' : ''}`}
+              className={`${isLandscapeMobile ? 'flex-1 min-h-0' : 'aspect-square'} overflow-hidden relative w-full cursor-pointer palette-container ${currentPalette === 2 ? 'selected-color' : ''}`}
               onClick={handleContainerClick(2)}
               ref={paletteRefs[2]}
             >
-              {renderPaletteSvg(2, 'Vibrant Palette')}
+              {renderPaletteSvg(2, 'Calm Palette')}
             </div>
-            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-left text-nowrap font-brand">
-              <p className="block leading-normal whitespace-pre">Cool</p>
+            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '16px', lineHeight: 1 } : {}}>
+              <p className="block leading-normal whitespace-pre">Calm</p>
             </div>
+          </div>
           </div>
         </div>
       </div>

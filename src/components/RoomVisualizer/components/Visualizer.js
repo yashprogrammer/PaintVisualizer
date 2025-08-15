@@ -18,11 +18,47 @@ const Visualizer = ({
   onClearAreas,
   onShare
 }) => {
+  // Maintain base image aspect ratio on small viewports (landscape mobile)
+  const [baseAspectRatio, setBaseAspectRatio] = React.useState(null);
+  const baseImgRef = React.useRef(null);
+  // Landscape scaling (mobile) relative to FHD baseline
+  const [landscapeScale, setLandscapeScale] = React.useState(1);
+  React.useEffect(() => {
+    const BASE_WIDTH = 1920;
+    const BASE_HEIGHT = 1080;
+    const updateScale = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isLandscape = w > h;
+      const isMobile = w <= 1024;
+      if (isLandscape && isMobile) {
+        const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+        setLandscapeScale(s);
+      } else {
+        setLandscapeScale(1);
+      }
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('orientationchange', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      window.removeEventListener('orientationchange', updateScale);
+    };
+  }, []);
+
+  const handleBaseImgLoad = React.useCallback((e) => {
+    const nw = e?.target?.naturalWidth || baseImgRef.current?.naturalWidth;
+    const nh = e?.target?.naturalHeight || baseImgRef.current?.naturalHeight;
+    if (nw && nh) {
+      const ratio = nw / nh;
+      // Guard: cap to sensible bounds in case of corrupted dimensions
+      if (ratio > 0.3 && ratio < 5) setBaseAspectRatio(ratio);
+    }
+  }, []);
+
   return (
-    <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden px-4 lg:px-[25px]  w-1/2 flex-shrink-0 h-full">
-      <div className="title-text font-normal leading-none text-black text-[28px] lg:text-[42px] text-center w-full font-brand">
-        <p className="block leading-normal">Visualizer</p>
-      </div>
+    <div className="column-2 column-padding flex flex-col items-center justify-between overflow-hidden py-6 px-4 lg:px-[25px]  w-1/2 flex-shrink-0 h-full">
       <div
         className="container-height flex flex-col gap-4 lg:gap-[21px] flex-1 items-center justify-end relative rounded-3xl w-full"
         style={{
@@ -31,19 +67,40 @@ const Visualizer = ({
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
       >
-        
+        <style jsx>{`
+          /* On small screens keep the visualizer box constrained by aspect ratio */
+          @media (max-width: 1024px) {
+            .visualizer-aspect {
+              aspect-ratio: var(--vr, 16/9);
+            }
+            .visualizer-aspect > .visualizer-box {
+              height: 100% !important;
+            }
+          }
+        `}</style>
         {/* Room Visualization Area */}
-        <div className="flex-1 flex flex-col gap-2.5 items-center justify-center overflow-hidden pb-0 pt-4 lg:pt-8 px-4 lg:px-[18px] w-full min-h-0">
-          <div 
-            ref={containerRef}
-            className="flex-1 w-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
-            onClick={handleCanvasClick}
-          >
+        <div className="flex-1 flex flex-col gap-2.5 items-center justify-center overflow-hidden pb-0 pt-2 lg:pt-4 px-4 lg:px-[18px] w-full min-h-0">
+          {/* Header section with title */}
+          <div className="flex flex-col px-0 lg:px-2 pt-0 pb-1 lg:pb-2 w-full">
+            <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-center font-brand mb-3">
+              <p className="block leading-normal">Visualizer</p>
+            </div>
+          
+          </div>
+          {/* Ratio wrapper (active on small screens only) */}
+          <div className="visualizer-aspect flex-1 w-full" style={{ ['--vr']: baseAspectRatio || 1.6 }}>
+            <div 
+              ref={containerRef}
+              className="visualizer-box w-full h-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
+              onClick={handleCanvasClick}
+            >
             {/* Clear Areas pill */}
-            <div className="absolute top-6 right-6 bg-white text-black px-3 py-2 rounded-lg flex items-center gap-2 shadow-sm z-[200]">
+            <div className="absolute bg-white text-black rounded-lg flex items-center gap-2 shadow-sm z-[200]"
+                 style={{ top: `${Math.round(24 * landscapeScale)}px`, right: `${Math.round(24 * landscapeScale)}px`, padding: `${Math.max(1, Math.round(8 * landscapeScale))}px ${Math.max(4, Math.round(12 * landscapeScale))}px` }}>
               <button
                 type="button"
-                className="text-[12px] font-medium"
+                className="font-medium"
+                style={{ fontSize: `${Math.max(10, Math.round(12 * landscapeScale))}px` }}
                 onClick={(e) => { e.stopPropagation(); onClearAreas && onClearAreas(); }}
               >
                 CLEAR AREAS
@@ -54,6 +111,9 @@ const Visualizer = ({
               src={roomData[currentRoom].baseImage} 
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+              ref={baseImgRef}
+              onLoad={handleBaseImgLoad}
+              draggable={false}
             />
             
             {/* Mask overlays for each surface */}
@@ -111,7 +171,7 @@ const Visualizer = ({
             )}
             
       
-         
+            </div>
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand w-full flex items-center justify-between px-6">
             <p className="block leading-normal">Select surface to paint</p>
