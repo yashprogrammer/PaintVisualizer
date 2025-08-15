@@ -34,6 +34,20 @@ React.useEffect(() => {
   };
 }, []);
 
+  // Build optimized asset paths for thumbnails: lqip -> low -> medium (no original)
+  const buildOptimized = React.useCallback((src) => {
+    if (!src || typeof src !== 'string') return { lqip: src, low: src, medium: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, low: `/optimized${src}-low`, medium: `/optimized${src}-med` };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      lqip: `/optimized${base}-lqip.jpg`,
+      low: `/optimized${base}-low${ext}`,
+      medium: `/optimized${base}-med${ext}`,
+    };
+  }, []);
+
   return (
     <React.Fragment>
       <style>{`
@@ -80,8 +94,8 @@ React.useEffect(() => {
                 } : { borderRadius: '8px' }}
               >
                 <img 
-                  src={`/optimized${room.baseImage.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}`}
-                  srcSet={`${`/optimized${room.baseImage}`.replace(/\.[^.]+$/, '-lqip.jpg')} 20w, ${`/optimized${room.baseImage}`.replace(/\.[^.]+$/, (ext) => `-med${ext}`)} 800w, ${room.baseImage} 1600w`}
+                  src={buildOptimized(room.baseImage).medium}
+                  srcSet={`${buildOptimized(room.baseImage).lqip} 20w, ${buildOptimized(room.baseImage).low} 400w, ${buildOptimized(room.baseImage).medium} 800w`}
                   sizes="25vw"
                   alt={`${room.name} preview`}
                   className="w-full h-full object-cover"
