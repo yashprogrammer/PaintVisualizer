@@ -24,6 +24,10 @@ const WelcomeScreen = () => {
   const [currentTaglineText, setCurrentTaglineText] = useState("TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL.");
   const duration = 3000; // 3 seconds
   const loop = false;
+  // Base design reference (FHD)
+  const BASE_WIDTH = 1920;
+  const BASE_HEIGHT = 1080;
+  const [scale, setScale] = useState(1);
   const MIN_DISTANCE = 100; // Prevent hearts within 100px radius of existing hearts
   const HEART_SIZE = 48; // Heart icon dimensions (approx)
   const RESTRICTED_MARGIN = 20; // Additional margin around restricted areas
@@ -39,6 +43,19 @@ const WelcomeScreen = () => {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     setCarouselImages(shuffled);
+  }, []);
+
+  // Keep the FHD layout proportions across all viewports
+  useEffect(() => {
+    const handleResize = () => {
+      const w = typeof window !== 'undefined' ? window.innerWidth : BASE_WIDTH;
+      const h = typeof window !== 'undefined' ? window.innerHeight : BASE_HEIGHT;
+      const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+      setScale(s);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Preload raw countries data once when the welcome screen mounts. The ApiService handles
@@ -396,63 +413,69 @@ const WelcomeScreen = () => {
       </div>
 
       {/* Content Layer - Centered Content (z-index: 10) */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-[20]">
-        {/* Heart Animation Container */}
-        <div 
-          ref={contentRef}
-          className="bg-white bg-opacity-70 backdrop-blur-md rounded-2xl text-center cursor-pointer shadow-lg flex flex-col items-center gap-6"
-          onClick={handleNavigate}
+      <div className="absolute inset-0 flex items-center justify-center z-[20]">
+        {/* Scaled root sized to FHD, scaled to fit viewport */}
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: BASE_WIDTH, height: BASE_HEIGHT, transform: `scale(${scale})`, transformOrigin: 'center center' }}
         >
-          {/* Heart Loading Animation */}
-          <div className="relative w-[38rem] h-[20rem] flex items-center justify-center">
-            {/* White heart as base - inherits z-index from parent */}
-            <img 
-              src="/COW_white_heart.png" 
-              alt="White Heart" 
-              className="absolute w-full h-full object-contain"
-            />
-            
-            {/* Red heart with animated clip-path - inherits z-index from parent */}
-            <img 
-              src="/COW_Red_heart_Explore.png" 
-              alt="Red Heart" 
-              className="absolute w-full h-full object-contain"
-              style={{ 
-                clipPath: clipPathValue,
-                transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
-              }}
-            />
-
-            {/* Beeping overlay to attract attention once fill completes */}
-            {showBeepingOverlay && (
-              <img
-                src="/BeepingHeart.png"
-                alt="Tap to explore"
-                className="heartbeat-overlay object-contain"
-                style={{ zIndex: 50 }}
+          {/* Heart Animation Container */}
+          <div 
+            ref={contentRef}
+            className="bg-white bg-opacity-70 backdrop-blur-md rounded-2xl text-center cursor-pointer shadow-lg flex flex-col items-center gap-6"
+            onClick={handleNavigate}
+          >
+            {/* Heart Loading Animation */}
+            <div className="relative w-[38rem] h-[20rem] flex items-center justify-center">
+              {/* White heart as base - inherits z-index from parent */}
+              <img 
+                src="/COW_white_heart.png" 
+                alt="White Heart" 
+                className="absolute w-full h-full object-contain"
               />
-            )}
-          </div>
-        </div>
+              
+              {/* Red heart with animated clip-path - inherits z-index from parent */}
+              <img 
+                src="/COW_Red_heart_Explore.png" 
+                alt="Red Heart" 
+                className="absolute w-full h-full object-contain"
+                style={{ 
+                  clipPath: clipPathValue,
+                  transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
+                }}
+              />
 
-        {/* Tagline Container - explicit z-index for clarity */}
-        <div 
-          ref={taglineRef} 
-          className="absolute bottom-10 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.65)',
-            border: '2px solid rgba(255, 255, 255, 1.0)'
-          }}
-        >
-          <p 
-            className="text-black text-lg font-bold tracking-wider"
+              {/* Beeping overlay to attract attention once fill completes */}
+              {showBeepingOverlay && (
+                <img
+                  src="/BeepingHeart.png"
+                  alt="Tap to explore"
+                  className="heartbeat-overlay object-contain"
+                  style={{ zIndex: 50 }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Tagline Container - positioned within the scaled root */}
+          <div 
+            ref={taglineRef} 
+            className="absolute bottom-10 backdrop-blur-md rounded-lg px-6 py-3 shadow-md z-[11]"
             style={{
-              opacity: taglineOpacity,
-              transition: 'opacity 0.3s ease-in-out'
+              backgroundColor: 'rgba(255, 255, 255, 0.65)',
+              border: '2px solid rgba(255, 255, 255, 1.0)'
             }}
           >
-            {currentTaglineText}
-          </p>
+            <p 
+              className="text-black text-lg font-bold tracking-wider"
+              style={{
+                opacity: taglineOpacity,
+                transition: 'opacity 0.3s ease-in-out'
+              }}
+            >
+              {currentTaglineText}
+            </p>
+          </div>
         </div>
       </div>
 
