@@ -15,6 +15,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env
 
 # logs
 npm-debug.log*
@@ -35,3 +36,5 @@ AssetsByClient/
 .cursorrules
 .DS_Store
 TestCases_Phase5_HotspotSelection.md
+
+response.json

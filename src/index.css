@@ -2,10 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour Sans (brand).
+   If the font is installed on the system it will be used via local().
+   To host it with the app, place webfont files under `public/fonts/` and
+   add additional sources here. */
+@font-face {
+  font-family: "Colour Sans";
+  src: local("Colour Sans Light"), local("Colour Sans");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Colour Sans";
+  src: local("Colour Sans Bold"), local("Colour Sans");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
   background-color: transparent;
+}
+
+/* Global typography defaults per brand guideline */
+@layer base {
+  html {
+    font-family: theme("fontFamily.sans");
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: theme("fontFamily.brand");
+    font-weight: 700; /* Use Colour Sans Bold for headings */
+  }
+  .text-contrast {
+    font-family: theme("fontFamily.brand");
+    font-weight: 300; /* Colour Sans Light for secondary lines */
+  }
+}
+
+@layer components {
+  .title-text { @apply font-brand; }
+  .vibrant-text { @apply font-brand; }
+  .surface-text { @apply font-brand; }
 }
 
 @layer utilities {
@@ -35,5 +76,71 @@ body,
 
   .animate-carousel-drift {
     animation: carousel-drift 60s linear infinite;
+  }
+
+  @keyframes heart-drift {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-6vw);
+    }
+  }
+
+  /* Heart beat emphasis for CTA */
+  @keyframes heart-beat {
+    0%, 100% {
+      transform: scale(1);
+    }
+    14% {
+      transform: scale(1.12);
+    }
+    28% {
+      transform: scale(1);
+    }
+    42% {
+      transform: scale(1.08);
+    }
+    70% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-heartbeat {
+    animation: heart-beat 1.1s ease-in-out infinite;
+    will-change: transform;
+    transform-origin: center center;
+  }
+
+  /* Centered variant that keeps the element translated to its center while scaling */
+  @keyframes heart-beat-centered {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    14% {
+      transform: translate(-50%, -52%) scale(1.07);
+    }
+    28% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    42% {
+      transform: translate(-50%, -51%) scale(1.04);
+    }
+    70% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  .heartbeat-overlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    animation: heart-beat-centered 1.1s ease-in-out infinite;
+    will-change: transform;
+    pointer-events: none;
   }
 }
