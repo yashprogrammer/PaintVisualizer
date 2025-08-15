@@ -8,6 +8,89 @@ import { citiesData } from '../../data/cities';
 
 const cityImages = Object.values(citiesData).map((c) => `/City/${c.name} H Small.png`);
 
+// Helper for optimized image sources
+const buildOptimized = (src) => {
+  if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+  const lastDot = src.lastIndexOf('.');
+  if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+  const base = src.substring(0, lastDot);
+  const ext = src.substring(lastDot);
+  return {
+    lqip: `/optimized${base}-lqip.jpg`,
+    medium: `/optimized${base}-med${ext}`,
+    original: src,
+  };
+};
+
+// Progressive image loader that displays LQIP first, then medium, then original
+// Props:
+// - startAt: 'lqip' | 'medium' (default 'lqip') - where to start for the first paint
+// - canUpgrade: if false, holds at current quality and defers preloads
+// - enableBlur: apply small blur while upgrading (disable for transparent PNGs)
+const ProgressiveImage = ({
+  src,
+  alt,
+  className,
+  style,
+  loading = 'lazy',
+  canUpgrade = true,
+  startAt = 'lqip',
+  enableBlur = true,
+  onOriginalLoad,
+}) => {
+  const { lqip, medium, original } = buildOptimized(src);
+  const [currentSrc, setCurrentSrc] = useState(startAt === 'medium' ? medium : lqip);
+  const [isBlurred, setIsBlurred] = useState(enableBlur);
+  const onOriginalLoadRef = useRef(onOriginalLoad);
+  useEffect(() => { onOriginalLoadRef.current = onOriginalLoad; }, [onOriginalLoad]);
+
+  // Reset to LQIP when the source changes
+  useEffect(() => {
+    let cancelled = false;
+    setCurrentSrc(startAt === 'medium' ? medium : lqip);
+    setIsBlurred(enableBlur);
+
+    // If we cannot upgrade yet, stop here (we'll upgrade when canUpgrade flips true)
+    if (!canUpgrade) {
+      return () => { cancelled = true; };
+    }
+
+    const mediumImg = new Image();
+    mediumImg.decoding = 'async';
+    mediumImg.src = medium;
+    mediumImg.onload = () => {
+      if (cancelled) return;
+      setCurrentSrc(medium);
+
+      const originalImg = new Image();
+      originalImg.decoding = 'async';
+      originalImg.src = original;
+      originalImg.onload = () => {
+        if (cancelled) return;
+        setCurrentSrc(original);
+        // soften transition a bit then remove blur
+        if (enableBlur) {
+          setTimeout(() => { if (!cancelled) setIsBlurred(false); }, 120);
+        }
+        if (onOriginalLoadRef.current) onOriginalLoadRef.current();
+      };
+    };
+
+    return () => { cancelled = true; };
+  }, [src, lqip, medium, original, canUpgrade, startAt, enableBlur]);
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={`${className} ${enableBlur && isBlurred ? 'blur-sm' : ''}`}
+      style={style}
+      loading={loading}
+      decoding="async"
+    />
+  );
+};
+
 const WelcomeScreen = () => {
   const contentRef = useRef(null);
   const taglineRef = useRef(null);
@@ -36,6 +119,9 @@ const WelcomeScreen = () => {
   const MAX_POPUP_HEARTS = 80; // maximum number of popup hearts allowed on screen
   // Randomize background carousel order once per mount
   const [carouselImages, setCarouselImages] = useState(cityImages);
+  // Gate background upgrades until center graphics reach original quality
+  const [centerOriginalCount, setCenterOriginalCount] = useState(0);
+  const centerReady = centerOriginalCount >= 2;
   useEffect(() => {
     const shuffled = [...cityImages];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -401,12 +487,15 @@ const WelcomeScreen = () => {
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-[1]">
         <div className="flex animate-carousel-drift">
           {[...carouselImages, ...carouselImages].map((image, index) => (
-            <img
+            <ProgressiveImage
               key={index}
               src={image}
               alt={`City ${index}`}
               className="h-full object-cover"
               style={{ width: 'auto', height: '100vh' }}
+              loading={index < 2 ? 'eager' : 'lazy'}
+              canUpgrade={centerReady}
+              enableBlur={false}
             />
           ))}
         </div>
@@ -427,15 +516,20 @@ const WelcomeScreen = () => {
           >
             {/* Heart Loading Animation */}
             <div className="relative w-[38rem] h-[20rem] flex items-center justify-center">
-              {/* White heart as base - inherits z-index from parent */}
-              <img 
+              {/* White heart as base - progressive */}
+              <ProgressiveImage 
                 src="/COW_white_heart.png" 
                 alt="White Heart" 
                 className="absolute w-full h-full object-contain"
+                loading="eager"
+                canUpgrade={true}
+                startAt="medium"
+                enableBlur={false}
+                onOriginalLoad={() => setCenterOriginalCount((c) => c + 1)}
               />
               
-              {/* Red heart with animated clip-path - inherits z-index from parent */}
-              <img 
+              {/* Red heart with animated clip-path - progressive */}
+              <ProgressiveImage 
                 src="/COW_Red_heart_Explore.png" 
                 alt="Red Heart" 
                 className="absolute w-full h-full object-contain"
@@ -443,15 +537,24 @@ const WelcomeScreen = () => {
                   clipPath: clipPathValue,
                   transition: isAnimating ? 'none' : 'clip-path 0.3s ease'
                 }}
+                loading="eager"
+                canUpgrade={true}
+                startAt="medium"
+                enableBlur={false}
+                onOriginalLoad={() => setCenterOriginalCount((c) => c + 1)}
               />
 
               {/* Beeping overlay to attract attention once fill completes */}
               {showBeepingOverlay && (
-                <img
+                <ProgressiveImage
                   src="/BeepingHeart.png"
                   alt="Tap to explore"
                   className="heartbeat-overlay object-contain"
                   style={{ zIndex: 50 }}
+                  loading="eager"
+                  canUpgrade={true}
+                  startAt="medium"
+                  enableBlur={false}
                 />
               )}
             </div>

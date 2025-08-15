@@ -57,6 +57,20 @@ const Visualizer = ({
     }
   }, []);
 
+  // Build optimized asset paths for src/srcSet
+  const buildOptimized = React.useCallback((src) => {
+    if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      lqip: `/optimized${base}-lqip.jpg`,
+      medium: `/optimized${base}-med${ext}`,
+      original: src,
+    };
+  }, []);
+
   return (
     <div className="visualizer-column column-2 column-padding flex flex-col items-center justify-start overflow-visible px-4 lg:px-[25px]  w-1/2 flex-shrink-0 min-h-[80vh] max-h-[95vh]">
       <div
@@ -160,17 +174,20 @@ const Visualizer = ({
             </div>
             {/* Base room image */}
             <img 
-              src={roomData[currentRoom].baseImage} 
+              src={buildOptimized(roomData[currentRoom].baseImage).medium}
+              srcSet={`${buildOptimized(roomData[currentRoom].baseImage).lqip} 20w, ${buildOptimized(roomData[currentRoom].baseImage).medium} 800w, ${buildOptimized(roomData[currentRoom].baseImage).original} 1600w`}
+              sizes="50vw"
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
               ref={baseImgRef}
               onLoad={handleBaseImgLoad}
+              decoding="async"
               draggable={false}
             />
             
             {/* Mask overlays for each surface */}
             {roomData[currentRoom].surfaces.map((surface, idx) => {
-              const maskLoaded = maskImagesRef.current[surface.id];
+              const loadedMask = maskImagesRef.current[surface.id];
               const isSelected = selectedSurface === surface.id;
               const surfaceColor = surfaceColors[surface.id];
 
@@ -179,8 +196,8 @@ const Visualizer = ({
 
               const styleObj = {
                 backgroundColor: surfaceColor ? surfaceColor : (isSelected ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.001)'),
-                maskImage: maskLoaded ? `url(${surface.mask})` : 'none',
-                WebkitMaskImage: maskLoaded ? `url(${surface.mask})` : 'none',
+                maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
                 maskSize: 'cover',
                 WebkitMaskSize: 'cover',
                 maskRepeat: 'no-repeat',
@@ -191,7 +208,7 @@ const Visualizer = ({
                 zIndex: isSelected ? 100 : idx + 1,
                 pointerEvents: 'none',
                 // Hide overlay if mask hasn't loaded to prevent full-image coloring
-                display: maskLoaded ? 'block' : 'none',
+                display: loadedMask ? 'block' : 'none',
                 transition: 'opacity 0.2s ease',
               };
 

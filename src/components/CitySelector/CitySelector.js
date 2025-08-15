@@ -52,6 +52,20 @@ const CitySelector = () => {
   }, []);
 
   const clampNumber = (min, value, max) => Math.min(max, Math.max(min, value));
+  // Build optimized URLs for src/srcSet
+  const buildOptimized = (src) => {
+    if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { lqip: `/optimized${src}-lqip.jpg`, medium: `/optimized${src}-med`, original: src };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      lqip: `/optimized${base}-lqip.jpg`,
+      medium: `/optimized${base}-med${ext}`,
+      original: src,
+    };
+  };
+  const mediumOnly = (src) => src ? `/optimized${src.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}` : src;
 
   // Derived responsive metrics
   const heartSizePx = clampNumber(320, Math.min(viewportWidth, viewportHeight) * 1, 1600);
@@ -340,10 +354,13 @@ const CitySelector = () => {
       {bgTransitions((styles, item) => (
         <animated.img
           key={item}
-          src={item}
+          src={buildOptimized(item).medium}
+          srcSet={`${buildOptimized(item).lqip} 20w, ${buildOptimized(item).medium} 800w, ${buildOptimized(item).original} 1600w`}
+          sizes="100vw"
           alt="Background"
           className="absolute inset-0 w-full h-full object-cover"
           style={{ ...styles, transform: 'scale(1)' }}
+          decoding="async"
         />
       ))}
       
@@ -589,7 +606,9 @@ const CitySelector = () => {
                       }}
                     >
                       <img 
-                        src={city.image} 
+                        src={buildOptimized(city.image).medium}
+                        srcSet={`${buildOptimized(city.image).lqip} 20w, ${buildOptimized(city.image).medium} 800w, ${buildOptimized(city.image).original} 1600w`}
+                        sizes="50vw"
                         alt={city.name}
                         className={`w-full h-full px-[1px] object-cover transition-all duration-300 select-none ${
                           isSelected
@@ -604,6 +623,7 @@ const CitySelector = () => {
                           filter: 'grayscale(0.50)', // Add a little bit of grayscale
                         }}
                         draggable={false}
+                        decoding="async"
                       />
                     </div>
                   );

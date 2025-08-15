@@ -80,9 +80,12 @@ React.useEffect(() => {
                 } : { borderRadius: '8px' }}
               >
                 <img 
-                  src={room.baseImage} 
+                  src={`/optimized${room.baseImage.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}`}
+                  srcSet={`${`/optimized${room.baseImage}`.replace(/\.[^.]+$/, '-lqip.jpg')} 20w, ${`/optimized${room.baseImage}`.replace(/\.[^.]+$/, (ext) => `-med${ext}`)} 800w, ${room.baseImage} 1600w`}
+                  sizes="25vw"
                   alt={`${room.name} preview`}
                   className="w-full h-full object-cover"
+                  decoding="async"
                 />
                 
                 {/* Text overlay */}

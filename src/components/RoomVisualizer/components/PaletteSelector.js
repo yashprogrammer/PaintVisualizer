@@ -195,7 +195,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
 
   const renderPaletteSvg = (paletteId, altText) => {
     const html = svgContent[paletteId];
-    const svgScale = isLandscapeMobile ? .7 : landscapeScale;
+    const svgScale = isLandscapeMobile ? 1.1 : landscapeScale;
     if (html) {
       return (
         <div
@@ -314,7 +314,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             >
               {renderPaletteSvg(1, 'Vibrant Palette')}
             </div>
-            <div className="vibrant-text text-center font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '16px', lineHeight: 1 } : {}}>
+            <div className="vibrant-text text-center font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '12px', lineHeight: 1 } : {}}>
               <p className="block leading-normal whitespace-pre">Vibrant</p>
             </div>
           </div>
@@ -329,7 +329,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
             >
               {renderPaletteSvg(2, 'Calm Palette')}
             </div>
-            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '16px', lineHeight: 1 } : {}}>
+            <div className="vibrant-text font-normal leading-none text-black text-[28px] lg:text-[40px] text-nowrap font-brand shrink-0" style={isLandscapeMobile ? { fontSize: '12px', lineHeight: 1 } : {}}>
               <p className="block leading-normal whitespace-pre">Calm</p>
             </div>
           </div>
