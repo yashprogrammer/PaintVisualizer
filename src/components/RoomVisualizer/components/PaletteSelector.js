@@ -287,12 +287,14 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
               </button>
             </div>
             <div className="flex flex-col flex-1">
-              <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-left font-brand mb-2" style={isLandscapeMobile ? { marginBottom: 4 } : {}}>
-                <p className="block leading-normal truncate">Color Lock UP</p>
+              <div className="title-text font-bold leading-none text-black text-[16px] lg:text-[20px] text-left font-brand mb-2" style={isLandscapeMobile ? { marginBottom: 4 } : {}}>
+                <p className="block leading-normal truncate" style={{
+                  fontSize: `${Math.max(12, Math.round(16 * landscapeScale))}px`
+                }}>Color Lock UP</p>
               </div>
               {cityName ? (
                 <div className="text-[#616161] subline-text font-sans mb-3" style={isLandscapeMobile ? { marginBottom: 4 } : {}}>
-                  <p className="block leading-normal whitespace-pre" style={{ fontSize: `${Math.max(12, Math.round(16 * landscapeScale))}px`, lineHeight: 1.1 }}>{cityName}</p>
+                  <p className="block leading-normal whitespace-pre" style={{ fontSize: `${Math.max(8, Math.round(16 * landscapeScale))}px`, lineHeight: 1.1 }}>{cityName}</p>
                 </div>
               ) : null}
             </div>

@@ -1,8 +1,39 @@
 import React from 'react';
 import { roomData } from '../../../data/roomData';
 
+
+
 const RoomOptions = ({ currentRoom, selectRoom }) => {
   // Font sizing is now controlled globally via `.room-name-label` CSS in `RoomVisualizer.js`.
+// Landscape scaling (mobile) relative to FHD baseline
+const [landscapeScale, setLandscapeScale] = React.useState(1);
+const [isLandscapeMobile, setIsLandscapeMobile] = React.useState(false);
+React.useEffect(() => {
+  const BASE_WIDTH = 1920;
+  const BASE_HEIGHT = 1080;
+  const updateScale = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const isLandscape = w > h;
+    const isMobile = w <= 1024;
+    if (isLandscape && isMobile) {
+      const s = Math.min(w / BASE_WIDTH, h / BASE_HEIGHT);
+      setLandscapeScale(s);
+      setIsLandscapeMobile(true);
+    } else {
+      setLandscapeScale(1);
+      setIsLandscapeMobile(false);
+    }
+  };
+  updateScale();
+  window.addEventListener('resize', updateScale);
+  window.addEventListener('orientationchange', updateScale);
+  return () => {
+    window.removeEventListener('resize', updateScale);
+    window.removeEventListener('orientationchange', updateScale);
+  };
+}, []);
+
   return (
     <React.Fragment>
       <style>{`
@@ -24,7 +55,9 @@ const RoomOptions = ({ currentRoom, selectRoom }) => {
           {/* Header section with title */}
           <div className="flex flex-col px-0 lg:px-2 pt-0 pb-3 lg:pb-4 w-full">
             <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-end font-brand mb-3">
-              <p className="block leading-normal">Select Room</p>
+              <p className="block leading-normal" style={{
+                fontSize: `${Math.max(12, Math.round(16 * landscapeScale))}px`
+              }}>Select Room</p>
             </div>
             {/* Separator line */}
             <div className="w-full h-px bg-gray-200"></div>
