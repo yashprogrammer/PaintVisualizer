@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import PaletteSelector from './components/PaletteSelector';
 import Visualizer from './components/Visualizer';
 import RoomOptions from './components/RoomOptions';
@@ -9,6 +9,7 @@ import ApiService from '../../services/api';
 const RoomVisualizer = () => {
   const { city } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const queryColorParam = searchParams.get('color');
   
@@ -196,22 +197,38 @@ const RoomVisualizer = () => {
       console.log(`Loading masks for room: ${currentRoom}`);
       
       const loadPromises = currentRoomData.surfaces.map(surface => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
-          img.src = surface.mask;
-          
-          console.log(`Loading mask for ${surface.id}: ${surface.mask}`);
-          
-          img.onload = () => {
-            console.log(`✅ Successfully loaded mask for ${surface.id}`);
+
+          const originalSrc = surface.mask;
+          const mediumSrc = `/optimized${originalSrc.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}`;
+          let triedFallback = false;
+
+          const finish = () => {
             maskImagesRef.current[surface.id] = img;
             resolve();
           };
+
+          img.onload = () => {
+            console.log(`✅ Successfully loaded mask for ${surface.id}`);
+            finish();
+          };
           img.onerror = (error) => {
-            console.error(`❌ Failed to load mask for ${surface.id}:`, surface.mask, error);
+            if (!triedFallback) {
+              triedFallback = true;
+              console.warn(`Retry original for mask ${surface.id}:`, mediumSrc, error);
+              img.src = originalSrc;
+              return;
+            }
+            console.error(`❌ Failed to load mask for ${surface.id}:`, originalSrc, error);
             resolve(); // Continue even if one mask fails
           };
+
+          // Try optimized medium first, then fallback to original on error
+          img.src = mediumSrc;
+
+          console.log(`Loading mask for ${surface.id}: trying ${mediumSrc} then ${originalSrc}`);
         });
       });
 
@@ -542,22 +559,22 @@ const RoomVisualizer = () => {
         
         /* Responsive adjustments */
          @media (max-width: 1024px) {
+           /* Keep a 3-column row layout on small screens (landscape mobile) */
            .main-container {
-             flex-direction: column;
-             height: auto;
-             min-height: 100vh;
+             flex-direction: row;
+             height: 100vh;
            }
+           /* Preserve visible three columns; rely on existing fractional widths */
            .column-1, .column-2, .column-3 {
-             width: 100% !important;
              flex-shrink: 1 !important;
            }
-          .title-text {
-            font-size: 28px !important;
-          }
-          .container-height {
-            height: auto !important;
-            min-height: 400px;
-          }
+           .title-text {
+             font-size: 28px !important;
+           }
+           .container-height {
+             height: auto !important;
+             min-height: 300px;
+           }
         }
         
         @media (max-width: 768px) {
@@ -574,14 +591,26 @@ const RoomVisualizer = () => {
             padding: 20px !important;
           }
         }
+
+        /* Typography scaling from FHD baseline across all viewports */
+        .main-container {
+          /* Scale factor relative to 1920px width, clamped for mobile and 4K */
+          --vr-scale: clamp(0.42, calc(100vw / 1920), 2);
+        }
+        .title-text { font-size: calc(20px * var(--vr-scale)) !important; }
+        .vibrant-text { font-size: calc(40px * var(--vr-scale)); }
+        .surface-text { font-size: calc(28px * var(--vr-scale)) !important; }
+        .room-name-label { font-size: clamp(10px, calc(14px * var(--vr-scale)), 18px) !important; }
+        .subline-text { font-size: calc(12px * var(--vr-scale)) !important; }
       `}</style>
-      <div className="main-container flex flex-row items-center justify-start w-full h-full py-12 px-6 gap-6">
+      <div className="main-container flex flex-row items-center justify-start w-full h-full  ">
         <PaletteSelector
           currentPalette={currentPalette}
           selectPalette={selectPalette}
           colorPalettes={colorPalettes}
           onColorPick={handleColorPick}
           cityName={cityLabel}
+          onBack={() => navigate('/city-selection')}
         />
         <Visualizer
           currentRoom={currentRoom}
