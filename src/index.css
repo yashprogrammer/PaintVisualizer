@@ -76,7 +76,7 @@ html, body, a, button, input, select, textarea, [role="button"] {
       transform: translateX(0%);
     }
     100% {
-      transform: translateX(-50%);
+      transform: translateX(-66.6667%);
     }
   }
 
