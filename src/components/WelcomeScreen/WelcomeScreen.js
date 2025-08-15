@@ -117,8 +117,17 @@ const WelcomeScreen = () => {
   const SEAM_MARGIN = 30; // Min distance from background image seams where hearts cannot spawn
   const POP_INTERVAL = 200; // ms between new popup hearts
   const MAX_POPUP_HEARTS = 80; // maximum number of popup hearts allowed on screen
+  // Animation speeds
+  const CAROUSEL_DURATION_S = 120; // slower drift for background
+  const HEART_DRIFT_DISTANCE_VW = 6; // keep same drift distance
+  const HEART_DRIFT_DURATION_S = (CAROUSEL_DURATION_S * HEART_DRIFT_DISTANCE_VW) / 100; // match carousel vw/s
   // Randomize background carousel order once per mount
   const [carouselImages, setCarouselImages] = useState(cityImages);
+  // Only render two images at a time for the drifting background
+  const [carouselIndices, setCarouselIndices] = useState(() => ({
+    left: 0,
+    right: cityImages.length > 1 ? 1 : 0,
+  }));
   // Gate background upgrades until center graphics reach original quality
   const [centerOriginalCount, setCenterOriginalCount] = useState(0);
   const centerReady = centerOriginalCount >= 2;
@@ -129,7 +138,19 @@ const WelcomeScreen = () => {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     setCarouselImages(shuffled);
+    // Reset two-slot indices after shuffling
+    setCarouselIndices({ left: 0, right: shuffled.length > 1 ? 1 : 0 });
   }, []);
+
+  // Advance the two-slot window every time the drift animation loops
+  const handleCarouselIteration = () => {
+    setCarouselIndices(({ left, right }) => {
+      const nextLeft = right;
+      const total = carouselImages.length || 1;
+      const nextRight = (right + 1) % total;
+      return { left: nextLeft, right: nextRight };
+    });
+  };
 
   // Keep the FHD layout proportions across all viewports
   useEffect(() => {
@@ -485,19 +506,37 @@ const WelcomeScreen = () => {
     <div className="h-screen w-screen overflow-hidden flex relative">
       {/* Background Layer - Carousel Container (z-index: 1) */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-[1]">
-        <div className="flex animate-carousel-drift">
-          {[...carouselImages, ...carouselImages].map((image, index) => (
+        <div
+          className="flex animate-carousel-drift"
+          onAnimationIteration={handleCarouselIteration}
+          style={{ animationDuration: `${CAROUSEL_DURATION_S}s` }}
+        >
+          {/* Left slide */}
+          {carouselImages.length > 0 && (
             <ProgressiveImage
-              key={index}
-              src={image}
-              alt={`City ${index}`}
-              className="h-full object-cover"
-              style={{ width: 'auto', height: '100vh' }}
-              loading={index < 2 ? 'eager' : 'lazy'}
+              key={`left-${carouselIndices.left}`}
+              src={carouselImages[carouselIndices.left]}
+              alt={`City ${carouselIndices.left}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
               canUpgrade={centerReady}
               enableBlur={false}
             />
-          ))}
+          )}
+          {/* Right slide */}
+          {carouselImages.length > 0 && (
+            <ProgressiveImage
+              key={`right-${carouselIndices.right}`}
+              src={carouselImages[carouselIndices.right]}
+              alt={`City ${carouselIndices.right}`}
+              className="h-full w-screen object-cover flex-shrink-0"
+              style={{ width: '100vw', height: '100vh' }}
+              loading="eager"
+              canUpgrade={centerReady}
+              enableBlur={false}
+            />
+          )}
         </div>
       </div>
 
@@ -591,7 +630,7 @@ const WelcomeScreen = () => {
             style={{
               left: heart.x,
               top: heart.y,
-              animation: 'heart-drift 7s linear forwards',
+              animation: `heart-drift ${HEART_DRIFT_DURATION_S}s linear forwards`,
               pointerEvents: 'none',
             }}
           >
