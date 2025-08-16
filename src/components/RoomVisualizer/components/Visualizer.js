@@ -74,9 +74,10 @@ const Visualizer = ({
   return (
     <div className="visualizer-column column-2 column-padding flex flex-col items-center justify-start overflow-visible px-4 lg:px-[25px]  w-1/2 flex-shrink-0 min-h-[80vh] max-h-[95vh]">
       <div
-        className="container-height flex flex-col gap-0 lg:gap-[21px] items-center justify-start relative rounded-[24px] w-full"
+        className="container-height flex flex-col gap-0 lg:gap-[21px] items-center justify-between relative rounded-[24px] w-full"
         style={{
           background: 'rgba(252, 252, 252, 0.70)',
+          minHeight:'95vh',
           boxShadow:
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
@@ -141,7 +142,7 @@ const Visualizer = ({
           }
         `}</style>
         {/* Room Visualization Area */}
-        <div className="flex flex-col gap-2.5 items-center justify-start overflow-hidden pb-0 pt-2 lg:pt-4 px-4 lg:px-[18px] w-full min-h-0">
+        <div className="flex flex-col gap-2.5 items-center justify-start overflow-hidden pb-0 pt-2 lg:pt-4 px-4 lg:px-[18px] w-full min-h-0 h-[70%]">
           {/* Header section with title */}
           <div className="flex flex-col px-0 lg:px-2 pt-0 pb-1 lg:pb-2 w-full">
             <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-center font-brand mb-0 lg:mb-3">
@@ -149,8 +150,11 @@ const Visualizer = ({
             </div>
           
           </div>
-          {/* Ratio wrapper (driven by base image aspect ratio) */}
-          <div className="visualizer-aspect w-full" style={{ ['--vr']: baseAspectRatio || 1.6 }}>
+
+
+          
+{/* Ratio wrapper (driven by base image aspect ratio) */}
+<div className="visualizer-aspect w-full" style={{ ['--vr']: baseAspectRatio || 1.6 }}>
             <div 
               ref={containerRef}
               className="visualizer-box w-full h-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
@@ -254,6 +258,10 @@ const Visualizer = ({
               Share
             </button>
           </div>
+
+          
+          
+          
         </div>
         
         {/* Paint Color Swatches */}

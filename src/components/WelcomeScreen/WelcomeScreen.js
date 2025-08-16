@@ -28,6 +28,9 @@ const buildOptimized = (src) => {
 // - startAt: 'lqip' | 'low' | 'medium' (default 'lqip') - where to start for the first paint
 // - canUpgrade: if false, holds at current quality and defers preloads
 // - enableBlur: apply small blur while upgrading (disable for transparent PNGs)
+// - maxQuality: 'lqip' | 'low' | 'medium' | 'original' (default 'original') - upper bound for upgrades
+// - preloadNext: when true (default), preloads the next step before swapping; when false, chains via the DOM img onload (1 network request per step)
+// - onFirstQualityLoad: callback invoked once when the initial `startAt` quality finishes loading in the DOM <img>
 const ProgressiveImage = ({
   src,
   alt,
@@ -37,6 +40,9 @@ const ProgressiveImage = ({
   canUpgrade = true,
   startAt = 'lqip',
   enableBlur = true,
+  maxQuality = 'original',
+  preloadNext = true,
+  onFirstQualityLoad,
   onOriginalLoad,
 }) => {
   const { lqip, low, medium, original } = buildOptimized(src);
@@ -45,6 +51,10 @@ const ProgressiveImage = ({
   const [isBlurred, setIsBlurred] = useState(enableBlur);
   const onOriginalLoadRef = useRef(onOriginalLoad);
   useEffect(() => { onOriginalLoadRef.current = onOriginalLoad; }, [onOriginalLoad]);
+  const onFirstQualityLoadRef = useRef(onFirstQualityLoad);
+  useEffect(() => { onFirstQualityLoadRef.current = onFirstQualityLoad; }, [onFirstQualityLoad]);
+  const imgElementRef = useRef(null);
+  const firstLoadNotifiedRef = useRef(false);
 
   // Reset to starting quality when the source changes
   useEffect(() => {
@@ -58,60 +68,118 @@ const ProgressiveImage = ({
       return () => { cancelled = true; };
     }
 
-    const loadImage = (url, onSuccess) => {
-      const img = new Image();
-      img.decoding = 'async';
-      img.src = url;
-      img.onload = () => { if (!cancelled) onSuccess && onSuccess(); };
-      img.onerror = () => { if (!cancelled) onSuccess && onSuccess('error'); };
+    const qualities = ['lqip', 'low', 'medium', 'original'];
+    const qualityToUrl = (q) => (q === 'lqip' ? lqip : q === 'low' ? low : q === 'medium' ? medium : original);
+    const startIndex = Math.max(0, qualities.indexOf(startAt));
+    const maxIndex = Math.max(0, qualities.indexOf(maxQuality));
+
+    const finalize = () => {
+      if (enableBlur) {
+        setTimeout(() => { if (!cancelled) setIsBlurred(false); }, 120);
+      }
+      if (maxQuality === 'original' && onOriginalLoadRef.current) {
+        onOriginalLoadRef.current();
+      }
     };
 
-    const goOriginal = () => {
-      loadImage(original, () => {
-        if (cancelled) return;
-        setCurrentSrc(original);
-        if (enableBlur) {
-          setTimeout(() => { if (!cancelled) setIsBlurred(false); }, 120);
-        }
-        if (onOriginalLoadRef.current) onOriginalLoadRef.current();
-      });
-    };
+    // Preload path: use off-DOM Image() to load before swapping
+    if (preloadNext) {
+      const loadImage = (url, onSuccess) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+        img.onload = () => { if (!cancelled) onSuccess && onSuccess(); };
+        img.onerror = () => { if (!cancelled) onSuccess && onSuccess('error'); };
+      };
 
-    const goMedium = () => {
-      loadImage(medium, () => {
-        if (cancelled) return;
-        setCurrentSrc(medium);
-        goOriginal();
-      });
-    };
+      const goTo = (q, next) => {
+        const url = qualityToUrl(q);
+        loadImage(url, () => {
+          if (cancelled) return;
+          setCurrentSrc(url);
+          if (next) {
+            next();
+          } else {
+            finalize();
+          }
+        });
+      };
 
-    const goLow = () => {
-      loadImage(low, () => {
-        if (cancelled) return;
-        setCurrentSrc(low);
-        goMedium();
-      });
-    };
+      // Build the chain from current startAt up to maxQuality
+      const steps = qualities.slice(startIndex + 1, maxIndex + 1);
+      if (steps.length === 0) {
+        // Already at or above maxQuality
+        finalize();
+      } else {
+        // Create nested calls to ensure sequential loading
+        let idx = 0;
+        const next = () => {
+          idx += 1;
+          if (idx < steps.length) {
+            goTo(steps[idx], next);
+          } else {
+            finalize();
+          }
+        };
+        goTo(steps[0], next);
+      }
 
-    if (startAt === 'medium') {
-      goOriginal();
-    } else if (startAt === 'low') {
-      goMedium();
-    } else {
-      goLow();
+      return () => { cancelled = true; };
     }
 
-    return () => { cancelled = true; };
-  }, [src, lqip, low, medium, original, canUpgrade, startAt, enableBlur]);
+    // No-preload path: rely on the DOM <img> onload; one request per step
+    const imgEl = imgElementRef.current;
+    if (!imgEl) {
+      return () => { cancelled = true; };
+    }
+    const queue = qualities.slice(startIndex + 1, maxIndex + 1);
+    const handleLoad = () => {
+      if (cancelled) return;
+      if (queue.length === 0) {
+        finalize();
+        return;
+      }
+      const nextQuality = queue.shift();
+      const nextUrl = qualityToUrl(nextQuality);
+      setCurrentSrc(nextUrl);
+    };
+    const handleImgOnload = () => {
+      if (!firstLoadNotifiedRef.current) {
+        firstLoadNotifiedRef.current = true;
+        if (onFirstQualityLoadRef.current) onFirstQualityLoadRef.current(startAt);
+      }
+      handleLoad();
+    };
+    imgEl.addEventListener('load', handleImgOnload);
+    // If the starting quality already loaded, kick off the chain immediately
+    if (imgEl.complete && imgEl.naturalWidth > 0) {
+      // Defer to avoid firing in the middle of a render
+      setTimeout(() => { if (!cancelled) {
+        if (!firstLoadNotifiedRef.current) {
+          firstLoadNotifiedRef.current = true;
+          if (onFirstQualityLoadRef.current) onFirstQualityLoadRef.current(startAt);
+        }
+        handleLoad();
+      } }, 0);
+    }
+    return () => { cancelled = true; if (imgEl) imgEl.removeEventListener('load', handleImgOnload); };
+  }, [src, lqip, low, medium, original, canUpgrade, startAt, enableBlur, maxQuality, preloadNext]);
 
   return (
     <img
+      ref={imgElementRef}
       src={currentSrc}
       alt={alt}
       className={`${className} ${enableBlur && isBlurred ? 'blur-sm' : ''}`}
       style={style}
       loading={loading}
       decoding="async"
+      onLoad={() => {
+        if (!firstLoadNotifiedRef.current) {
+          firstLoadNotifiedRef.current = true;
+          if (onFirstQualityLoadRef.current) onFirstQualityLoadRef.current(startAt);
+        }
+      }}
     />
   );
 };
@@ -148,39 +216,35 @@ const WelcomeScreen = () => {
   // For three slides, the container travels 200vw per cycle (from 0 to -200vw)
   const HEART_DRIFT_DURATION_S = (CAROUSEL_DURATION_S * HEART_DRIFT_DISTANCE_VW) / 200; // match carousel vw/s
   // Randomize background carousel order once per mount
-  const [carouselImages, setCarouselImages] = useState(cityImages);
+  // Shuffle helper used for initial render and on iterations
+  const shuffleOnce = (arr) => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
+  // Initialize the carousel with a shuffled order so the first paint is random
+  const [carouselImages, setCarouselImages] = useState(() => shuffleOnce(cityImages));
   // Render three images at a time for the drifting background
   const [carouselIndices, setCarouselIndices] = useState(() => ({
     first: 0,
     second: cityImages.length > 1 ? 1 : 0,
     third: cityImages.length > 2 ? 2 : (cityImages.length > 1 ? 1 : 0),
   }));
+  // Flag when at least one background slide has painted at low quality
+  const [bgLowReady, setBgLowReady] = useState(false);
   // Gate background upgrades until center graphics reach original quality
   const [centerOriginalCount, setCenterOriginalCount] = useState(0);
   const centerReady = centerOriginalCount >= 2;
-  useEffect(() => {
-    const shuffled = [...cityImages];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    setCarouselImages(shuffled);
-    // Reset three-slot indices after shuffling
-    setCarouselIndices({
-      first: 0,
-      second: shuffled.length > 1 ? 1 : 0,
-      third: shuffled.length > 2 ? 2 : (shuffled.length > 1 ? 1 : 0),
-    });
-  }, []);
+  // (Removed mount-time shuffle useEffect to avoid first-paint flicker)
 
   // When animation completes (2nd image fully passed), restart with a fresh random order
   const handleCarouselIteration = () => {
     setCarouselImages((prev) => {
-      const shuffled = [...prev];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
+      const shuffled = shuffleOnce(prev);
       setCarouselIndices({
         first: 0,
         second: shuffled.length > 1 ? 1 : 0,
@@ -416,12 +480,21 @@ const WelcomeScreen = () => {
     }
   };
 
+  const isWhiteColor = (color) => {
+    if (!color || typeof color !== 'string') return false;
+    const normalized = color.toLowerCase().replace(/\s+/g, '');
+    return normalized === '#ffffff' || normalized === 'rgb(255,255,255)';
+  };
+
   const createHeart = (existingHearts) => {
     const position = getRandomPosition(existingHearts);
     if (!position) return null; // Give up if no safe spot found
 
     // Sample color roughly at the center of the heart (offset half the icon size)
     const color = getColorAtViewport(position.x + 24, position.y + 24);
+
+    // Skip hearts that would render as completely white
+    if (isWhiteColor(color)) return null;
 
     const newHeart = {
       id: Date.now() + Math.random(),
@@ -459,21 +532,18 @@ const WelcomeScreen = () => {
     }
   }, [isAnimating, duration, loop]);
 
-  // Popup hearts animation effect
+  // Popup hearts animation effect (starts only after BG low-quality is painted)
   useEffect(() => {
-    // Create hearts at regular intervals
+    if (!bgLowReady) return undefined;
     const interval = setInterval(() => {
       setPopupHearts(prev => {
         if (prev.length >= MAX_POPUP_HEARTS) return prev; // Respect global heart limit
         const newHeart = createHeart(prev);
         return newHeart ? [...prev, newHeart] : prev;
       });
-    }, POP_INTERVAL); // Create hearts faster
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
+    }, POP_INTERVAL);
+    return () => clearInterval(interval);
+  }, [bgLowReady]);
 
   // Animate hearts after they're created and handle fade out
   useEffect(() => {
@@ -559,7 +629,11 @@ const WelcomeScreen = () => {
               style={{ width: '100vw', height: '100vh' }}
               loading="eager"
               canUpgrade={centerReady}
+              startAt="low"
+              maxQuality="medium"
+              preloadNext={false}
               enableBlur={false}
+              onFirstQualityLoad={() => setBgLowReady(true)}
             />
           )}
           {/* Second slide */}
@@ -572,7 +646,11 @@ const WelcomeScreen = () => {
               style={{ width: '100vw', height: '100vh' }}
               loading="eager"
               canUpgrade={centerReady}
+              startAt="low"
+              maxQuality="medium"
+              preloadNext={false}
               enableBlur={false}
+              onFirstQualityLoad={() => setBgLowReady(true)}
             />
           )}
           {/* Third slide */}
@@ -585,7 +663,11 @@ const WelcomeScreen = () => {
               style={{ width: '100vw', height: '100vh' }}
               loading="eager"
               canUpgrade={centerReady}
+              startAt="low"
+              maxQuality="medium"
+              preloadNext={false}
               enableBlur={false}
+              onFirstQualityLoad={() => setBgLowReady(true)}
             />
           )}
         </div>
