@@ -97,17 +97,20 @@ const CitySelector = () => {
     preloadBlurred(cities[nextIndex]?.blurredImage);
   }, [selectedIndex]);
 
-  // Progressive LQIP -> Low -> Medium -> Original for blurred background (delay upgrades until fade-in completes)
-  const ProgressiveBg = ({ image, styles, activateAfterMs = 700 }) => {
+  // Progressive background loader with configurable start/max quality
+  // Default behavior keeps backward compatibility; can start at 'low' and cap at 'medium'
+  const ProgressiveBg = ({ image, styles, activateAfterMs = 700, startAt = 'lqip', maxQuality = 'original' }) => {
     const { lqip, low, medium, original } = buildOptimized(image);
-    const [src, setSrc] = useState(lqip);
+    const initialSrc = startAt === 'low' ? low : lqip;
+    const allowOriginal = maxQuality === 'original';
+    const [src, setSrc] = useState(initialSrc);
     const [canUpgrade, setCanUpgrade] = useState(false);
     const readyRef = useRef({ low: false, medium: false, original: false });
     const canUpgradeRef = useRef(false);
 
     useEffect(() => {
       let cancelled = false;
-      setSrc(lqip);
+      setSrc(initialSrc);
       setCanUpgrade(false);
       canUpgradeRef.current = false;
       readyRef.current = { low: false, medium: false, original: false };
@@ -125,24 +128,26 @@ const CitySelector = () => {
       medImg.onload = () => {
         if (cancelled) return;
         readyRef.current.medium = true;
-        if (canUpgradeRef.current) setSrc((prev) => (prev === original ? prev : medium));
+        if (canUpgradeRef.current) setSrc((prev) => (allowOriginal && prev === original ? prev : medium));
       };
       medImg.src = medium;
 
-      const fullImg = new Image();
-      fullImg.onload = () => {
-        if (cancelled) return;
-        readyRef.current.original = true;
-        if (canUpgradeRef.current) setSrc(original);
-      };
-      fullImg.src = original;
+      if (allowOriginal) {
+        const fullImg = new Image();
+        fullImg.onload = () => {
+          if (cancelled) return;
+          readyRef.current.original = true;
+          if (canUpgradeRef.current) setSrc(original);
+        };
+        fullImg.src = original;
+      }
 
       // Allow upgrades after fade-in completes
       const t = setTimeout(() => {
         if (cancelled) return;
         canUpgradeRef.current = true;
         setCanUpgrade(true);
-        if (readyRef.current.original) {
+        if (allowOriginal && readyRef.current.original) {
           setSrc(original);
         } else if (readyRef.current.medium) {
           setSrc(medium);
@@ -155,19 +160,19 @@ const CitySelector = () => {
         cancelled = true;
         clearTimeout(t);
       };
-    }, [image, lqip, low, medium, original, activateAfterMs]);
+    }, [image, lqip, low, medium, original, activateAfterMs, startAt, maxQuality]);
 
     // Once upgrades are allowed, continue stepping up quality as images become available
     useEffect(() => {
       if (!canUpgrade) return;
-      if (readyRef.current.original) {
+      if (allowOriginal && readyRef.current.original) {
         setSrc(original);
       } else if (readyRef.current.medium && src !== medium) {
         setSrc(medium);
       } else if (readyRef.current.low && src === lqip) {
         setSrc(low);
       }
-    }, [canUpgrade, src, lqip, low, medium, original]);
+    }, [canUpgrade, src, lqip, low, medium, original, maxQuality]);
 
     return (
       <animated.img
@@ -175,6 +180,48 @@ const CitySelector = () => {
         alt="Background"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ ...styles, transform: 'scale(1)' }}
+        decoding="async"
+      />
+    );
+  };
+
+  // Progressive foreground image for carousel: LQIP -> Low -> Medium
+  const ProgressiveImage = ({ image, alt, className, style, draggable = false }) => {
+    const { lqip, low, medium } = buildOptimized(image);
+    const [src, setSrc] = useState(lqip);
+    const readyRef = useRef({ low: false, medium: false });
+
+    useEffect(() => {
+      let cancelled = false;
+      setSrc(lqip);
+      readyRef.current = { low: false, medium: false };
+
+      const lowImg = new Image();
+      lowImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.low = true;
+        setSrc(prev => (prev === lqip ? low : prev));
+      };
+      lowImg.src = low;
+
+      const medImg = new Image();
+      medImg.onload = () => {
+        if (cancelled) return;
+        readyRef.current.medium = true;
+        setSrc(medium);
+      };
+      medImg.src = medium;
+
+      return () => { cancelled = true; };
+    }, [image, lqip, low, medium]);
+
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        style={style}
+        draggable={draggable}
         decoding="async"
       />
     );
@@ -466,7 +513,14 @@ const CitySelector = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
       {bgTransitions((styles, item) => (
-        <ProgressiveBg key={item} image={item} styles={styles} activateAfterMs={700} />
+        <ProgressiveBg
+          key={item}
+          image={item}
+          styles={styles}
+          activateAfterMs={700}
+          startAt="low"
+          maxQuality="medium"
+        />
       ))}
       
       {/* Overlay */}
@@ -717,10 +771,8 @@ const CitySelector = () => {
                         // Removed padding to eliminate gaps between images
                       }}
                     >
-                      <img 
-                        src={buildOptimized(city.image).medium}
-                        srcSet={`${buildOptimized(city.image).lqip} 20w, ${buildOptimized(city.image).medium} 800w, ${buildOptimized(city.image).original} 1600w`}
-                        sizes="50vw"
+                      <ProgressiveImage
+                        image={city.image}
                         alt={city.name}
                         className={`w-full h-full px-[1px] object-cover transition-all duration-300 select-none ${
                           isSelected
@@ -732,10 +784,9 @@ const CitySelector = () => {
                           objectPosition: 'center',
                           minWidth: '100%',
                           minHeight: '100%',
-                          filter: 'grayscale(0.50)', // Add a little bit of grayscale
+                          filter: 'grayscale(0.50)',
                         }}
                         draggable={false}
-                        decoding="async"
                       />
                     </div>
                   );
