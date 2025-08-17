@@ -133,7 +133,7 @@ const Visualizer = ({
         `}</style>
         {/* Top: Title */}
         <div className="flex flex-col px-0 lg:px-2 pt-2 lg:pt-4 pb-1 lg:pb-2 w-full">
-          <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-center font-brand mb-0 lg:mb-3">
+          <div className=" font-bold leading-none  text-black text-[18px] lg:text-[24px] xl:text-[28px] 2xl:text-[36px] text-center font-brand mb-0 lg:mb-3 lg:mt-3">
             <p className="block leading-normal">Visualizer</p>
           </div>
         </div>
