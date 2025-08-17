@@ -73,13 +73,17 @@ const Visualizer = ({
         }}
       >
         <style jsx>{`
-          /* Always keep the visualizer box constrained by the base image aspect ratio */
+          /* Aspect ratio: only lock on large screens and above */
           .visualizer-aspect {
             width: 100%;
-            aspect-ratio: var(--vr, 16/9);
           }
-          .visualizer-aspect > .visualizer-box {
-            height: 100% !important;
+          @media (min-width: 1024px) {
+            .visualizer-aspect {
+              aspect-ratio: var(--vr, 16/9);
+            }
+            .visualizer-aspect > .visualizer-box {
+              height: 100% !important;
+            }
           }
           /* Responsive swatch sizing and padding so swatches don't squeeze the image */
           .swatch-size {
