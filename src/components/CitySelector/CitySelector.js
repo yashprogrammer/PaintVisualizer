@@ -540,8 +540,8 @@ const CitySelector = () => {
       
       {/* Overlay */}
       <img
-        src={buildOptimized('/Overlay.png').medium}
-        srcSet={`${buildOptimized('/Overlay.png').lqip} 20w, ${buildOptimized('/Overlay.png').medium} 800w, /Overlay.png 1600w`}
+        src={buildOptimized('/Overlay.png').low}
+        srcSet={`${buildOptimized('/Overlay.png').low} 800w, ${buildOptimized('/Overlay.png').medium} 1600w`}
         sizes="100vw"
         alt="Overlay"
         className="absolute inset-0 w-full h-full object-cover"
