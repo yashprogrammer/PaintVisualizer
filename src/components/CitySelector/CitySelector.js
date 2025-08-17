@@ -238,6 +238,16 @@ const CitySelector = () => {
     );
   };
 
+  // Prime HLS playlist in the HTTP cache to speed up first playback
+  const prefetchHls = async (slug) => {
+    try {
+      if (!slug) return;
+      await fetch(`/videos/${slug}/master.m3u8`, { cache: 'force-cache' });
+    } catch (_) {
+      // Non-blocking
+    }
+  };
+
   // Derived responsive metrics
   const heartSizePx = clampNumber(320, Math.min(viewportWidth, viewportHeight) * 1, 1600);
   const fanWidth = clampNumber(180, viewportWidth * 0.18, 380);
@@ -441,35 +451,21 @@ const CitySelector = () => {
     });
   };
 
-  const prefetchVideo = async (url, key) => {
-    try {
-      if (!url || !key) return;
-      setLoadingText('Buffering intro video...');
-      const res = await fetch(url, { cache: 'force-cache' });
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      if (typeof window !== 'undefined') {
-        window.cityVideoUrls = window.cityVideoUrls || {};
-        window.cityVideoUrls[key] = objectUrl;
-        window.cityVideoUrls[key.toLowerCase()] = objectUrl;
-      }
-    } catch (_) {
-      // Non-blocking
-    }
-  };
+  // Note: We no longer prefetch fallback MP4s; HLS is the primary path.
 
   const handleCityClick = async () => {
     if (isGlobalLoading) return;
     const selectedCity = cities[selectedIndex];
-    const cityKey = selectedCity.name.toLowerCase();
+    const cityKey = selectedCity.name.toLowerCase().replace(/'/g, '');
     setIsGlobalLoading(true);
     setLoadingText('Preparing experience...');
     try {
       const cityData = await ApiService.getCityData(cityKey);
       setLoadingText('Loading assets...');
-      await preloadImage(cityData?.hotspotImage);
-      const introVideoUrl = (cityData?.videos && cityData.videos[0]) ? cityData.videos[0] : '/City/Video/Video.mp4';
-      await prefetchVideo(introVideoUrl, cityKey);
+      await Promise.all([
+        preloadImage(cityData?.hotspotImage),
+        prefetchHls(cityKey),
+      ]);
     } catch (e) {
       console.warn('Prefetch failed, continuing to navigate:', e);
     } finally {

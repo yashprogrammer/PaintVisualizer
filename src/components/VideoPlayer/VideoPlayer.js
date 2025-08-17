@@ -1,68 +1,154 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ApiService from '../../services/api';
+import Hls from 'hls.js';
 
 const VideoPlayer = () => {
   const { city } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const hasNavigatedRef = useRef(false);
-  const [videoUrl, setVideoUrl] = useState('/City/Video/Video.mp4'); // fallback
-  const [loading, setLoading] = useState(true);
+  const hlsRef = useRef(null);
+  const mp4FallbackRef = useRef('/City/Video/Video.mp4');
+  const [playbackSource, setPlaybackSource] = useState({ type: 'mp4', url: '/City/Video/Video.mp4' });
+  const mp4FallbackTriedDefaultRef = useRef(false);
   const [error, setError] = useState(null);
   const [isPreparingHotspots, setIsPreparingHotspots] = useState(false);
   const [prepMessage, setPrepMessage] = useState('');
 
   useEffect(() => {
-    const fetchVideoUrl = async () => {
+    const fetchAndSelectSource = async () => {
       if (!city) {
-        setError("No city specified");
+        setError('No city specified');
         setLoading(false);
         return;
       }
 
       try {
-        setLoading(true);
+        const sanitizedCity = city.toLowerCase().replace(/'/g, '').trim();
 
-        const sanitizedCity = city.toLowerCase().trim();
-
-        // Prefer pre-fetched object URL if present
+        // Determine MP4 fallback candidates
+        let fallbackMp4 = mp4FallbackRef.current || '/City/Video/Video.mp4';
         if (typeof window !== 'undefined' && window.cityVideoUrls && window.cityVideoUrls[sanitizedCity]) {
-          setVideoUrl(window.cityVideoUrls[sanitizedCity]);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch cached video list
-        const cityData = await ApiService.getCityData(sanitizedCity);
-
-        if (cityData && cityData.videos && cityData.videos.length > 0) {
-          console.log(`Using API video for ${sanitizedCity}:`, cityData.videos[0]);
-          setVideoUrl(cityData.videos[0]);
+          fallbackMp4 = window.cityVideoUrls[sanitizedCity];
         } else {
-          console.log(`No API video for ${sanitizedCity}, using fallback`);
+          try {
+            const cityData = await ApiService.getCityData(sanitizedCity);
+            if (cityData && cityData.videos && cityData.videos.length > 0) {
+              console.log(`Using API video for ${sanitizedCity}:`, cityData.videos[0]);
+              fallbackMp4 = cityData.videos[0];
+            } else {
+              console.log(`No API video for ${sanitizedCity}, using fallback MP4`);
+            }
+            // Prefer per-city MP4 in public/City/Video/<CityName>.mp4 when available by convention
+            if (cityData && cityData.name) {
+              const encodedName = encodeURIComponent(cityData.name);
+              fallbackMp4 = `/City/Video/${encodedName}.mp4`;
+            }
+          } catch (apiErr) {
+            console.warn('API video lookup failed; will use default MP4 fallback.', apiErr);
+          }
         }
 
-        setLoading(false);
+        mp4FallbackRef.current = fallbackMp4;
+
+        // Prefer HLS path for the city; rely on runtime fallback if unavailable
+        const hlsUrl = `/videos/${sanitizedCity}/master.m3u8`;
+        setPlaybackSource({ type: 'hls', url: hlsUrl });
+        // Note: loading will be set to false when HLS is ready or we fallback to MP4
       } catch (err) {
-        console.error('Error fetching video URL:', err);
+        console.error('Error preparing video sources:', err);
         setError(`Failed to load video for ${city}`);
-        setLoading(false);
+        setPlaybackSource({ type: 'mp4', url: mp4FallbackRef.current || '/City/Video/Video.mp4' });
       }
     };
 
-    fetchVideoUrl();
+    fetchAndSelectSource();
   }, [city]);
 
+  // Attach HLS or use native/Safari HLS, otherwise fall back to MP4
   useEffect(() => {
-    // Auto-play the video when component mounts and video URL is ready
-    if (videoRef.current && !loading) {
-      videoRef.current.load(); // Reload video with new source
-      videoRef.current.play().catch(error => {
-        console.log('Auto-play failed:', error);
-      });
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Cleanup previous HLS instance if any
+    if (hlsRef.current) {
+      try { hlsRef.current.destroy(); } catch (_) {}
+      hlsRef.current = null;
     }
-  }, [videoUrl, loading]);
+
+    if (playbackSource.type === 'hls') {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(playbackSource.url);
+        hls.attachMedia(video);
+        const onManifestParsed = () => {
+          video.play().catch((e) => console.log('Auto-play failed (HLS):', e));
+        };
+        const onError = (_event, data) => {
+          if (data && data.fatal) {
+            try { hls.destroy(); } catch (_) {}
+            hlsRef.current = null;
+            setPlaybackSource({ type: 'mp4', url: mp4FallbackRef.current || '/City/Video/Video.mp4' });
+            setLoading(false);
+          }
+        };
+        hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+        hls.on(Hls.Events.ERROR, onError);
+
+        return () => {
+          hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+          hls.off(Hls.Events.ERROR, onError);
+          try { hls.destroy(); } catch (_) {}
+          hlsRef.current = null;
+        };
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS
+        const onLoadedMetadata = () => {
+          video.play().catch((e) => console.log('Auto-play failed (Safari HLS):', e));
+        };
+        const onError = () => {
+          setPlaybackSource({ type: 'mp4', url: mp4FallbackRef.current || '/City/Video/Video.mp4' });
+        };
+        video.src = playbackSource.url;
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+        video.addEventListener('error', onError);
+        return () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('error', onError);
+          try { video.removeAttribute('src'); video.load(); } catch (_) {}
+        };
+      } else {
+        // No HLS support, fallback to MP4
+        setPlaybackSource({ type: 'mp4', url: mp4FallbackRef.current || '/City/Video/Video.mp4' });
+      }
+    }
+  }, [playbackSource]);
+
+  // Auto-play for MP4 fallback
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (playbackSource.type === 'mp4') {
+      try {
+        video.load();
+        video.play().catch((e) => console.log('Auto-play failed (MP4):', e));
+      } catch (e) {
+        console.log('Error starting MP4 playback:', e);
+      }
+    }
+  }, [playbackSource]);
+
+  // Handle video element errors (particularly for MP4 fallback path existence)
+  const handleVideoElementError = () => {
+    if (playbackSource.type !== 'mp4') return;
+    // If per-city MP4 failed, try default shared MP4 once
+    if (!mp4FallbackTriedDefaultRef.current && playbackSource.url !== '/City/Video/Video.mp4') {
+      mp4FallbackTriedDefaultRef.current = true;
+      setPlaybackSource({ type: 'mp4', url: '/City/Video/Video.mp4' });
+    }
+  };
 
   const preloadImage = (src) => {
     return new Promise((resolve) => {
@@ -82,7 +168,7 @@ const VideoPlayer = () => {
       if (videoRef.current) {
         try { videoRef.current.pause(); } catch (_) {}
       }
-      const sanitizedCity = city.toLowerCase().trim();
+      const sanitizedCity = city.toLowerCase().replace(/'/g, '').trim();
       const cityData = await ApiService.getCityData(sanitizedCity);
       setPrepMessage('Loading hotspot image...');
       await preloadImage(cityData?.hotspotImage);
@@ -127,13 +213,7 @@ const VideoPlayer = () => {
           </div>
         </div>
       )}
-      {loading && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-          <div className="px-4 py-2 rounded-lg bg-black/40 text-white text-sm backdrop-blur-sm">
-            Loading video...
-          </div>
-        </div>
-      )}
+      {/* Loading overlay removed per request */}
       {error && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40">
           <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-red-600/80 text-white shadow-lg">
@@ -152,6 +232,7 @@ const VideoPlayer = () => {
         className="w-full h-full object-cover"
         onEnded={handleVideoEnd}
         onTimeUpdate={handleTimeUpdate}
+        onError={handleVideoElementError}
         muted
         playsInline
         style={{
@@ -161,7 +242,9 @@ const VideoPlayer = () => {
           outline: 'none'
         }}
       >
-        <source src={videoUrl} type="video/mp4" />
+        {playbackSource.type === 'mp4' && (
+          <source src={playbackSource.url} type="video/mp4" />
+        )}
         Your browser does not support the video tag.
       </video>
       {/* Skip indicator */}
