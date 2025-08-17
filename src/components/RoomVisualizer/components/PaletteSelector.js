@@ -87,12 +87,70 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
     }
   }, [colorPalettes]);
 
+  // Add hover event listeners to SVG paths after content is injected
+  React.useEffect(() => {
+    const addHoverListeners = () => {
+      [1, 2].forEach((paletteId) => {
+        const container = paletteRefs[paletteId]?.current;
+        if (!container) return;
+        
+        const paths = container.querySelectorAll('.lockup-svg path');
+        paths.forEach((path) => {
+          const handleMouseEnter = () => {
+            // Only add hover effect if not currently in idle animation
+            if (!path.classList.contains('idle-elevate')) {
+              path.classList.add('hover-elevate');
+            }
+          };
+          
+          const handleMouseLeave = () => {
+            // Remove hover effect (idle-elevate takes priority anyway)
+            path.classList.remove('hover-elevate');
+          };
+          
+          // Remove existing listeners first to avoid duplicates
+          path.removeEventListener('mouseenter', handleMouseEnter);
+          path.removeEventListener('mouseleave', handleMouseLeave);
+          
+          // Add new listeners
+          path.addEventListener('mouseenter', handleMouseEnter);
+          path.addEventListener('mouseleave', handleMouseLeave);
+          
+          // Store listeners for cleanup
+          path._hoverListeners = { handleMouseEnter, handleMouseLeave };
+        });
+      });
+    };
+
+    // Add listeners after a short delay to ensure SVG content is fully rendered
+    const timeoutId = setTimeout(addHoverListeners, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      // Cleanup hover listeners on unmount
+      [1, 2].forEach((paletteId) => {
+        const container = paletteRefs[paletteId]?.current;
+        if (!container) return;
+        
+        const paths = container.querySelectorAll('.lockup-svg path');
+        paths.forEach((path) => {
+          if (path._hoverListeners) {
+            path.removeEventListener('mouseenter', path._hoverListeners.handleMouseEnter);
+            path.removeEventListener('mouseleave', path._hoverListeners.handleMouseLeave);
+            delete path._hoverListeners;
+          }
+          path.classList.remove('hover-elevate');
+        });
+      });
+    };
+  }, [svgContent]); // Re-run when SVG content changes
+
   // Utility: clear queued timeouts and remove elevation class from any paths
   const stopIdleAnimation = React.useCallback(() => {
     isAnimatingRef.current = false;
     timeoutsRef.current.forEach((t) => clearTimeout(t));
     timeoutsRef.current = [];
-    // Remove class from both palettes if present
+    // Remove idle elevation class from both palettes if present
     [1, 2].forEach((id) => {
       const container = paletteRefs[id]?.current;
       if (!container) return;
@@ -238,6 +296,33 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
 
   return (
     <div className="column-1 column-padding flex flex-col items-start justify-start overflow-hidden py-6 px-4 lg:px-[25px] w-1/4 flex-shrink-0 h-full">
+      <style jsx>{`
+        /* Hover elevation effect for individual SVG paths */
+        .lockup-svg path.hover-elevate {
+          transform: translateY(-3px);
+          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+          transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        /* Auto-animation elevation effect (existing) */
+        .lockup-svg path.idle-elevate {
+          transform: translateY(-6px);
+          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+          transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        /* Base styling for smooth transitions */
+        .lockup-svg path {
+          transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          cursor: pointer;
+        }
+        
+        /* Ensure idle animation takes priority over hover */
+        .lockup-svg path.idle-elevate.hover-elevate {
+          transform: translateY(-6px);
+          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+        }
+      `}</style>
       <div
         className="container-height flex-1 relative rounded-3xl w-full"
         style={{
