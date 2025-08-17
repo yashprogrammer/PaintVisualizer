@@ -532,7 +532,7 @@ const RoomVisualizer = () => {
           filter: drop-shadow(0 4px 8px rgba(0,0,0,0.18));
         }
         .room-option:hover > div:first-child {
-          transform: scale(1.05);
+         
           transition: transform 0.2s ease;
         }
         
