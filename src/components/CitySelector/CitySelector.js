@@ -78,6 +78,20 @@ const CitySelector = () => {
   };
   const mediumOnly = (src) => src ? `/optimized${src.replace(/\.[^.]+$/, (ext) => `-med${ext}`)}` : src;
 
+  // Build optimized video URLs for low/medium/original
+  const buildOptimizedVideo = (src) => {
+    if (!src || typeof src !== 'string') return { low: src, medium: src, original: src };
+    const lastDot = src.lastIndexOf('.');
+    if (lastDot === -1) return { low: `/optimized${src}-low`, medium: `/optimized${src}-med`, original: src };
+    const base = src.substring(0, lastDot);
+    const ext = src.substring(lastDot);
+    return {
+      low: `/optimized${base}-low${ext}`,
+      medium: `/optimized${base}-med${ext}`,
+      original: src,
+    };
+  };
+
   // Preload blurred backgrounds for adjacent cities (prev/next) to speed up transitions
   useEffect(() => {
     if (!Array.isArray(cities) || cities.length === 0) return;
@@ -86,31 +100,41 @@ const CitySelector = () => {
 
     const preloadBlurred = (src) => {
       if (!src) return;
-      const { lqip, low, medium, original } = buildOptimized(src);
-      const i1 = new Image(); i1.src = lqip;
-      const i1b = new Image(); i1b.src = low;
-      const i2 = new Image(); i2.src = medium;
-      const i3 = new Image(); i3.src = original;
+      const { low } = buildOptimized(src);
+      const img = new Image();
+      img.src = low;
     };
 
     preloadBlurred(cities[prevIndex]?.blurredImage);
     preloadBlurred(cities[nextIndex]?.blurredImage);
   }, [selectedIndex]);
 
-  // Progressive LQIP -> Low -> Medium -> Original for blurred background (delay upgrades until fade-in completes)
-  const ProgressiveBg = ({ image, styles, activateAfterMs = 700 }) => {
+  // Progressive background loader with configurable start/max quality
+  // Default behavior keeps backward compatibility; can start at 'low' and cap at 'medium'
+  const ProgressiveBg = ({ image, styles, activateAfterMs = 700, startAt = 'lqip', maxQuality = 'original' }) => {
     const { lqip, low, medium, original } = buildOptimized(image);
-    const [src, setSrc] = useState(lqip);
+    const initialSrc = startAt === 'low' ? low : lqip;
+    const allowOriginal = maxQuality === 'original';
+    const onlyLow = maxQuality === 'low';
+    const [src, setSrc] = useState(initialSrc);
     const [canUpgrade, setCanUpgrade] = useState(false);
     const readyRef = useRef({ low: false, medium: false, original: false });
     const canUpgradeRef = useRef(false);
 
     useEffect(() => {
       let cancelled = false;
-      setSrc(lqip);
+      setSrc(initialSrc);
       setCanUpgrade(false);
       canUpgradeRef.current = false;
       readyRef.current = { low: false, medium: false, original: false };
+
+      // If only low quality is requested, set it and skip any further preloading/upgrades
+      if (onlyLow) {
+        setSrc(low);
+        return () => {
+          cancelled = true;
+        };
+      }
 
       // Preload low, medium, and original immediately
       const lowImg = new Image();
@@ -125,24 +149,26 @@ const CitySelector = () => {
       medImg.onload = () => {
         if (cancelled) return;
         readyRef.current.medium = true;
-        if (canUpgradeRef.current) setSrc((prev) => (prev === original ? prev : medium));
+        if (canUpgradeRef.current) setSrc((prev) => (allowOriginal && prev === original ? prev : medium));
       };
       medImg.src = medium;
 
-      const fullImg = new Image();
-      fullImg.onload = () => {
-        if (cancelled) return;
-        readyRef.current.original = true;
-        if (canUpgradeRef.current) setSrc(original);
-      };
-      fullImg.src = original;
+      if (allowOriginal) {
+        const fullImg = new Image();
+        fullImg.onload = () => {
+          if (cancelled) return;
+          readyRef.current.original = true;
+          if (canUpgradeRef.current) setSrc(original);
+        };
+        fullImg.src = original;
+      }
 
       // Allow upgrades after fade-in completes
       const t = setTimeout(() => {
         if (cancelled) return;
         canUpgradeRef.current = true;
         setCanUpgrade(true);
-        if (readyRef.current.original) {
+        if (allowOriginal && readyRef.current.original) {
           setSrc(original);
         } else if (readyRef.current.medium) {
           setSrc(medium);
@@ -155,19 +181,20 @@ const CitySelector = () => {
         cancelled = true;
         clearTimeout(t);
       };
-    }, [image, lqip, low, medium, original, activateAfterMs]);
+    }, [image, lqip, low, medium, original, activateAfterMs, startAt, maxQuality]);
 
     // Once upgrades are allowed, continue stepping up quality as images become available
     useEffect(() => {
+      if (onlyLow) return;
       if (!canUpgrade) return;
-      if (readyRef.current.original) {
+      if (allowOriginal && readyRef.current.original) {
         setSrc(original);
       } else if (readyRef.current.medium && src !== medium) {
         setSrc(medium);
       } else if (readyRef.current.low && src === lqip) {
         setSrc(low);
       }
-    }, [canUpgrade, src, lqip, low, medium, original]);
+    }, [canUpgrade, src, lqip, low, medium, original, maxQuality]);
 
     return (
       <animated.img
@@ -175,6 +202,37 @@ const CitySelector = () => {
         alt="Background"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ ...styles, transform: 'scale(1)' }}
+        decoding="async"
+      />
+    );
+  };
+
+  // Progressive foreground image for carousel: Low only (skip LQIP and Medium)
+  const ProgressiveImage = ({ image, alt, className, style, draggable = false }) => {
+    const { low } = buildOptimized(image);
+    const [src, setSrc] = useState(low);
+
+    useEffect(() => {
+      let cancelled = false;
+      setSrc(low);
+
+      const lowImg = new Image();
+      lowImg.onload = () => {
+        if (cancelled) return;
+        setSrc(low);
+      };
+      lowImg.src = low;
+
+      return () => { cancelled = true; };
+    }, [image, low]);
+
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        style={style}
+        draggable={draggable}
         decoding="async"
       />
     );
@@ -193,19 +251,23 @@ const CitySelector = () => {
   const heartScale = heartSizePx / BASE_HEART;
   const cityFontPx = clampNumber(24, Math.round(baseCityFontPx * heartScale), 180);
   const exploreFontPx = clampNumber(12, Math.round(baseExploreFontPx * heartScale), 72);
+  // City-specific heading scale adjustments to avoid overflow within heart
+  const getCityFontScale = (name) => {
+    if (!name || typeof name !== 'string') return 1;
+    const key = name.trim().toLowerCase();
+    if (key === 'morocco') return 0.93; // 7% smaller
+    return 1;
+  };
 
   // Logo sizing responsive to both width and height
   const logoWidthPx = clampNumber(64, Math.min(viewportWidth * 0.11, viewportHeight * 0.14), 220);
   const logoTopPx = clampNumber(8, viewportHeight * 0.02, 32);
   const logoRightPx = clampNumber(8, viewportWidth * 0.02, 40);
 
-  // Retrieve preloaded video from localStorage if available
-  const getVideoSource = (city) => {
-    if (typeof window === 'undefined') return city.video;
-    if (typeof window !== 'undefined' && window.cityVideoUrls && window.cityVideoUrls[city.name]) {
-      return window.cityVideoUrls[city.name];
-    }
-    return city.video;
+  // Always use low-quality variant for heart video (fallback to original if missing)
+  const getPrioritizedVideoSources = (city) => {
+    const { low, original } = buildOptimizedVideo(city.video);
+    return [low || original].filter(Boolean);
   };
   // Text/panel are controlled via a one-shot transition keyed by displayed city
   // Responsive carousel sizing
@@ -466,7 +528,14 @@ const CitySelector = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Background Image with Blur */}
       {bgTransitions((styles, item) => (
-        <ProgressiveBg key={item} image={item} styles={styles} activateAfterMs={700} />
+        <ProgressiveBg
+          key={item}
+          image={item}
+          styles={styles}
+          activateAfterMs={700}
+          startAt="low"
+          maxQuality="low"
+        />
       ))}
       
       {/* Overlay */}
@@ -531,6 +600,7 @@ const CitySelector = () => {
                 {/* Video background crossfading between cities */}
                 {videoTransitions((styles, item) => {
                   const cityForVideo = cities[item];
+                  const sources = getPrioritizedVideoSources(cityForVideo);
                   return (
                     <animated.video
                       key={item}
@@ -540,9 +610,12 @@ const CitySelector = () => {
                       autoPlay
                       muted
                       playsInline
-                      preload="auto"
+                      preload={selectedIndex === item ? 'auto' : 'metadata'}
+                      poster={mediumOnly(cityForVideo.image)}
                     >
-                      <source src={getVideoSource(cityForVideo)} type="video/mp4" />
+                      {sources.map((src, idx) => (
+                        <source key={idx} src={src} type="video/mp4" />
+                      ))}
                       Your browser does not support the video tag.
                     </animated.video>
                   );
@@ -607,7 +680,7 @@ const CitySelector = () => {
                       }}
                       className="cursor-pointer text-white flex flex-col items-center justify-center"
                     >
-                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: `${cityFontPx}px`, lineHeight: 1, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
+                      <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: `${Math.round(cityFontPx * getCityFontScale(cities[item].name))}px`, lineHeight: 1, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
                         {cities[item].name.toUpperCase()}
                       </h1>
                      <p className="font-light tracking-[0.3em] select-none text-gray-800 font-brand" style={{ fontSize: `${exploreFontPx}px`, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
@@ -693,7 +766,8 @@ const CitySelector = () => {
                 }}
                 className={`flex h-full ${!instantJump && isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''} ${isGlobalLoading ? 'cursor-wait' : (isDragging ? 'cursor-grabbing' : 'cursor-grab')}`}
                 style={{
-                  transform: `translateX(${translateX + dragOffset}px)`,
+                  transform: `translate3d(${translateX + dragOffset}px, 0, 0)`,
+                  willChange: 'transform',
                   width: `${extendedCities.length * itemWidth}px`,
                   touchAction: isGlobalLoading ? 'none' : 'pan-y',
                 }}
@@ -717,12 +791,10 @@ const CitySelector = () => {
                         // Removed padding to eliminate gaps between images
                       }}
                     >
-                      <img 
-                        src={buildOptimized(city.image).medium}
-                        srcSet={`${buildOptimized(city.image).lqip} 20w, ${buildOptimized(city.image).medium} 800w, ${buildOptimized(city.image).original} 1600w`}
-                        sizes="50vw"
+                      <ProgressiveImage
+                        image={city.image}
                         alt={city.name}
-                        className={`w-full h-full px-[1px] object-cover transition-all duration-300 select-none ${
+                        className={`w-full h-full px-[1px] object-cover transition-opacity duration-300 select-none ${
                           isSelected
                             ? 'opacity-100 shadow-lg scale-100' 
                             : 'opacity-80 scale-100'
@@ -732,10 +804,9 @@ const CitySelector = () => {
                           objectPosition: 'center',
                           minWidth: '100%',
                           minHeight: '100%',
-                          filter: 'grayscale(0.50)', // Add a little bit of grayscale
+                          filter: 'grayscale(0.50)',
                         }}
                         draggable={false}
-                        decoding="async"
                       />
                     </div>
                   );

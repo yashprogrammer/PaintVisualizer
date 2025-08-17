@@ -19,8 +19,6 @@ const Visualizer = ({
   onShare
 }) => {
   // Maintain base image aspect ratio on small viewports (landscape mobile)
-  const [baseAspectRatio, setBaseAspectRatio] = React.useState(null);
-  const baseImgRef = React.useRef(null);
   // Landscape scaling (mobile) relative to FHD baseline
   const [landscapeScale, setLandscapeScale] = React.useState(1);
   React.useEffect(() => {
@@ -47,15 +45,7 @@ const Visualizer = ({
     };
   }, []);
 
-  const handleBaseImgLoad = React.useCallback((e) => {
-    const nw = e?.target?.naturalWidth || baseImgRef.current?.naturalWidth;
-    const nh = e?.target?.naturalHeight || baseImgRef.current?.naturalHeight;
-    if (nw && nh) {
-      const ratio = nw / nh;
-      // Guard: cap to sensible bounds in case of corrupted dimensions
-      if (ratio > 0.3 && ratio < 5) setBaseAspectRatio(ratio);
-    }
-  }, []);
+  
 
   // Build optimized asset paths for src/srcSet
   const buildOptimized = React.useCallback((src) => {
@@ -74,9 +64,10 @@ const Visualizer = ({
   return (
     <div className="visualizer-column column-2 column-padding flex flex-col items-center justify-start overflow-visible px-4 lg:px-[25px]  w-1/2 flex-shrink-0 min-h-[80vh] max-h-[95vh]">
       <div
-        className="container-height flex flex-col gap-0 lg:gap-[21px] items-center justify-start relative rounded-[24px] w-full"
+        className="container-height flex flex-col gap-0 lg:gap-[21px] items-center justify-between relative rounded-[24px] w-full"
         style={{
           background: 'rgba(252, 252, 252, 0.70)',
+          minHeight:'95vh',
           boxShadow:
             '0 244px 68px 0 rgba(0, 0, 0, 0.00), 0 156px 63px 0 rgba(0, 0, 0, 0.01), 0 88px 53px 0 rgba(0, 0, 0, 0.03), 0 39px 39px 0 rgba(0, 0, 0, 0.04), 0 10px 22px 0 rgba(0, 0, 0, 0.05)'
         }}
@@ -140,17 +131,19 @@ const Visualizer = ({
             }
           }
         `}</style>
-        {/* Room Visualization Area */}
-        <div className="flex flex-col gap-2.5 items-center justify-start overflow-hidden pb-0 pt-2 lg:pt-4 px-4 lg:px-[18px] w-full min-h-0">
-          {/* Header section with title */}
-          <div className="flex flex-col px-0 lg:px-2 pt-0 pb-1 lg:pb-2 w-full">
-            <div className="title-text font-bold leading-none text-black text-[18px] lg:text-[20px] text-center font-brand mb-0 lg:mb-3">
-              <p className="block leading-normal">Visualizer</p>
-            </div>
-          
+        {/* Top: Title */}
+        <div className="flex flex-col px-0 lg:px-2 pt-2 lg:pt-4 pb-1 lg:pb-2 w-full">
+          <div className=" font-bold leading-none  text-black text-[18px] lg:text-[24px] xl:text-[28px] 2xl:text-[36px] text-center font-brand mb-0 lg:mb-3 lg:mt-3">
+            <p className="block leading-normal">Visualizer</p>
           </div>
-          {/* Ratio wrapper (driven by base image aspect ratio) */}
-          <div className="visualizer-aspect w-full" style={{ ['--vr']: baseAspectRatio || 1.6 }}>
+        </div>
+        {/* Room Visualization Area */}
+        <div className="flex flex-col gap-2.5 items-center justify-center overflow-hidden px-4 lg:px-[18px] w-full min-h-0 flex-1">
+
+
+          
+{/* Ratio wrapper (locked to 1920/1308 aspect ratio) */}
+<div className="visualizer-aspect w-full" style={{ ['--vr']: '1920/1308' }}>
             <div 
               ref={containerRef}
               className="visualizer-box w-full h-full rounded-2xl lg:rounded-3xl relative cursor-pointer min-h-[200px] overflow-hidden"
@@ -179,8 +172,6 @@ const Visualizer = ({
               sizes="50vw"
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
-              ref={baseImgRef}
-              onLoad={handleBaseImgLoad}
               decoding="async"
               draggable={false}
             />
@@ -254,6 +245,10 @@ const Visualizer = ({
               Share
             </button>
           </div>
+
+          
+          
+          
         </div>
         
         {/* Paint Color Swatches */}
@@ -261,7 +256,7 @@ const Visualizer = ({
           className="w-[calc(100%-16px)] rounded-[24px] border-[3px] border-solid border-[#D2D2D2] mt-3 lg:mt-4 mx-2 mb-2"
           style={{ background: 'linear-gradient(188deg, #FFF 0.36%, #F3F3F3 99.39%)' }}
         >
-          <div className="flex flex-row gap-4 lg:gap-[42px] items-end justify-evenly overflow-hidden px-6 lg:px-10 pt-3 pb-2 lg:pt-4 lg:pb-3 w-full min-h-0">
+          <div className="flex flex-row gap-4  items-end justify-evenly overflow-hidden px-6  pt-3 pb-2 lg:pt-4 lg:pb-3 w-full min-h-0">
             {/** Helper to choose text color for swatch background */}
             {(() => {
               return null; // placeholder to allow function declarations below without changing JSX flow
