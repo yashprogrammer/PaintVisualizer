@@ -441,15 +441,7 @@ const CitySelector = () => {
     }, 800);
   };
 
-  const preloadImage = (src) => {
-    return new Promise((resolve) => {
-      if (!src) return resolve();
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => resolve();
-      img.src = src;
-    });
-  };
+
 
   // Note: We no longer prefetch fallback MP4s; HLS is the primary path.
 
@@ -463,7 +455,6 @@ const CitySelector = () => {
       const cityData = await ApiService.getCityData(cityKey);
       setLoadingText('Loading assets...');
       await Promise.all([
-        preloadImage(cityData?.hotspotImage),
         prefetchHls(cityKey),
       ]);
     } catch (e) {

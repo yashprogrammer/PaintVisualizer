@@ -150,15 +150,7 @@ const VideoPlayer = () => {
     }
   };
 
-  const preloadImage = (src) => {
-    return new Promise((resolve) => {
-      if (!src) return resolve();
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => resolve();
-      img.src = src;
-    });
-  };
+ 
 
   const prepareAndNavigateToHotspots = async () => {
     if (hasNavigatedRef.current || isPreparingHotspots) return;
@@ -171,7 +163,6 @@ const VideoPlayer = () => {
       const sanitizedCity = city.toLowerCase().replace(/'/g, '').trim();
       const cityData = await ApiService.getCityData(sanitizedCity);
       setPrepMessage('Loading hotspot image...');
-      await preloadImage(cityData?.hotspotImage);
       hasNavigatedRef.current = true;
       navigate(`/hotspots/${city}`, { state: { cityData, imagePreloaded: true } });
     } catch (e) {
