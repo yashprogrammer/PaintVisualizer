@@ -5,6 +5,7 @@ import Visualizer from './components/Visualizer';
 import RoomOptions from './components/RoomOptions';
 import { roomData } from '../../data/roomData';
 import ApiService from '../../services/api';
+import ShareModal from './components/ShareModal';
 
 const RoomVisualizer = () => {
   const { city } = useParams();
@@ -48,6 +49,7 @@ const RoomVisualizer = () => {
   const containerRef = useRef(null);
   const maskImagesRef = useRef({});
   const [isMasksLoaded, setIsMasksLoaded] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   // Function to extract colors from SVG content
   const extractColorsFromSVG = (svgContent) => {
@@ -465,29 +467,218 @@ const RoomVisualizer = () => {
     setSelectedSurface(null);
   };
 
-  // Share current state (city + current paint color) via Web Share API or clipboard fallback
-  const handleShare = async () => {
+  // Open the Share modal
+  const handleShare = () => {
+    setIsShareOpen(true);
+  };
+
+  // Build a printable/exportable image of the current scene and trigger download
+  const generateAndDownloadImage = async () => {
     try {
-      const url = new URL(window.location.href);
-      if (currentPaintColor) {
-        url.searchParams.set('color', encodeURIComponent(currentPaintColor.replace(/^#/, '')));
-      } else {
-        url.searchParams.delete('color');
-      }
-      const shareData = {
-        title: 'Room Visualizer',
-        text: 'Check out my room palette',
-        url: url.toString()
+      const CANVAS_WIDTH = 1240; // approx A4 width at ~150dpi
+      const CANVAS_HEIGHT = 1754; // A4-ish portrait
+      const canvas = document.createElement('canvas');
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Margins and layout
+      const marginX = 64;
+      const topAreaHeight = 120;
+      const gap = 24;
+
+      // 1) Draw Dulux logo on top, centered
+      await new Promise((resolve) => {
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.onload = () => {
+          const maxLogoW = CANVAS_WIDTH * 0.5;
+          const scale = Math.min(maxLogoW / logo.width, (topAreaHeight - 20) / logo.height);
+          const w = logo.width * scale;
+          const h = logo.height * scale;
+          const x = (CANVAS_WIDTH - w) / 2;
+          const y = 20 + (topAreaHeight - 20 - h) / 2;
+          ctx.drawImage(logo, x, y, w, h);
+          resolve();
+        };
+        logo.onerror = () => resolve();
+        logo.src = '/Dulux.png';
+      });
+
+      // 2) Compose the room image (base + colored masks)
+      const imageArea = {
+        x: marginX,
+        y: topAreaHeight + gap,
+        w: CANVAS_WIDTH - marginX * 2,
+        h: 860,
       };
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareData.url);
-        // Optional: toast could be added; keeping silent to avoid alerts
+
+      // Draw base image, fit within imageArea keeping aspect ratio (cover)
+      await new Promise((resolve) => {
+        const baseImg = new Image();
+        baseImg.crossOrigin = 'anonymous';
+        baseImg.onload = () => {
+          const iw = baseImg.width;
+          const ih = baseImg.height;
+          const arImg = iw / ih;
+          const arBox = imageArea.w / imageArea.h;
+          let dw = imageArea.w;
+          let dh = imageArea.h;
+          let dx = imageArea.x;
+          let dy = imageArea.y;
+          if (arImg > arBox) {
+            // image is wider; fit height, crop width
+            dh = imageArea.h;
+            dw = dh * arImg;
+            dx = imageArea.x - (dw - imageArea.w) / 2;
+          } else {
+            // image taller; fit width, crop height
+            dw = imageArea.w;
+            dh = dw / arImg;
+            dy = imageArea.y - (dh - imageArea.h) / 2;
+          }
+          ctx.save();
+          ctx.beginPath();
+          // Rounded corners like UI
+          const r = 18;
+          ctx.moveTo(imageArea.x + r, imageArea.y);
+          ctx.arcTo(imageArea.x + imageArea.w, imageArea.y, imageArea.x + imageArea.w, imageArea.y + imageArea.h, r);
+          ctx.arcTo(imageArea.x + imageArea.w, imageArea.y + imageArea.h, imageArea.x, imageArea.y + imageArea.h, r);
+          ctx.arcTo(imageArea.x, imageArea.y + imageArea.h, imageArea.x, imageArea.y, r);
+          ctx.arcTo(imageArea.x, imageArea.y, imageArea.x + imageArea.w, imageArea.y, r);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(baseImg, dx, dy, dw, dh);
+          ctx.restore();
+          resolve();
+        };
+        baseImg.onerror = () => resolve();
+        baseImg.src = roomData[currentRoom].baseImage;
+      });
+
+      // Overlay coloured masks
+      const currentRoomData = roomData[currentRoom];
+      const surfaces = currentRoomData?.surfaces || [];
+      for (const surface of surfaces) {
+        const color = (surfaceColors[currentRoom] || {})[surface.id];
+        const maskImg = maskImagesRef.current[surface.id];
+        if (!color || !maskImg) continue;
+
+        // Prepare an offscreen canvas to tint by mask alpha
+        const temp = document.createElement('canvas');
+        temp.width = imageArea.w;
+        temp.height = imageArea.h;
+        const tctx = temp.getContext('2d');
+
+        // Draw mask to temp scaled to imageArea
+        // We assume mask aligns with base image when stretched to the same box
+        tctx.drawImage(maskImg, 0, 0, temp.width, temp.height);
+        // Keep only mask area with the fill color
+        tctx.globalCompositeOperation = 'source-in';
+        tctx.fillStyle = color;
+        tctx.fillRect(0, 0, temp.width, temp.height);
+
+        // Multiply onto main canvas for a more natural blend
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(temp, imageArea.x, imageArea.y);
+        ctx.restore();
       }
-    } catch (e) {
-      console.warn('Share failed:', e);
+
+      // 3) Draw selected colors grid (2x2)
+      const swatches = (colorPalettes[currentPalette]?.paintColors || []).slice(0, 4);
+      const swatchAreaTop = imageArea.y + imageArea.h + gap * 1.5;
+      const gridW = CANVAS_WIDTH - marginX * 2;
+      const gridH = CANVAS_HEIGHT - swatchAreaTop - 64;
+      const cellW = (gridW - gap) / 2;
+      const cellH = (gridH - gap) / 2;
+
+      const isColorUsedInRoom = (hex) => {
+        const used = surfaceColors[currentRoom] || {};
+        return Object.values(used).some((c) => (c || '').toUpperCase() === (hex || '').toUpperCase());
+      };
+
+      const parseHex = (hex) => {
+        if (!hex || typeof hex !== 'string') return { r: 255, g: 255, b: 255 };
+        const n = hex.replace('#', '').trim();
+        if (n.length === 3) {
+          return { r: parseInt(n[0] + n[0], 16), g: parseInt(n[1] + n[1], 16), b: parseInt(n[2] + n[2], 16) };
+        }
+        return { r: parseInt(n.slice(0, 2), 16), g: parseInt(n.slice(2, 4), 16), b: parseInt(n.slice(4, 6), 16) };
+      };
+
+      for (let i = 0; i < 4; i++) {
+        const row = Math.floor(i / 2);
+        const col = i % 2;
+        const x = marginX + col * (cellW + gap);
+        const y = swatchAreaTop + row * (cellH + gap);
+        const color = swatches[i];
+
+        // Card background
+        ctx.save();
+        const radius = 18;
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + cellW, y, x + cellW, y + cellH, radius);
+        ctx.arcTo(x + cellW, y + cellH, x, y + cellH, radius);
+        ctx.arcTo(x, y + cellH, x, y, radius);
+        ctx.arcTo(x, y, x + cellW, y, radius);
+        ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle = color || '#E5E7EB';
+        ctx.fillRect(x, y, cellW, cellH);
+
+        // Text overlay if there is a color
+        if (color) {
+          const info = (colorInfo || {})[(color || '').toUpperCase()] || {};
+          const { r, g, b } = parseHex(color);
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const text = brightness <= 140 ? '#FFFFFF' : '#000000';
+          ctx.fillStyle = text;
+          ctx.font = 'bold 24px Inter, Arial, sans-serif';
+          ctx.fillText(info.name || '', x + 20, y + 40);
+          ctx.font = '16px Inter, Arial, sans-serif';
+          if (info.detail) ctx.fillText(info.detail, x + 20, y + 70);
+
+          if (isColorUsedInRoom(color)) {
+            // Tag: Featured in scene
+            const tag = 'Featured in scene';
+            const padX = 10;
+            const padY = 6;
+            ctx.font = 'bold 14px Inter, Arial, sans-serif';
+            const tw = ctx.measureText(tag).width;
+            const bx = x + 20;
+            const by = y + cellH - 20 - 22;
+            ctx.fillStyle = text === '#000000' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)';
+            ctx.fillRect(bx - padX, by - 16 - padY, tw + padX * 2, 16 + padY * 2);
+            ctx.fillStyle = text === '#000000' ? '#FFFFFF' : '#000000';
+            ctx.fillText(tag, bx, by);
+          }
+        }
+
+        ctx.restore();
+      }
+
+      // Trigger download
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `room-share-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.warn('Failed to generate image', err);
     }
+  };
+
+  const handleShareConfirm = async () => {
+    await generateAndDownloadImage();
+    setIsShareOpen(false);
   };
 
   return (
@@ -637,6 +828,11 @@ const RoomVisualizer = () => {
         <RoomOptions
           currentRoom={currentRoom}
           selectRoom={selectRoom}
+        />
+        <ShareModal
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          onConfirm={handleShareConfirm}
         />
       </div>
     </div>
