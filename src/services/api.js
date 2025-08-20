@@ -1,8 +1,8 @@
 // API service for communicating with ColorsWorld backend
 import axios from 'axios';
-import { citiesData } from '../data/cities';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:15205/api/v1';
+console.log('REACT_APP_API_BASE_URL:', process.env.REACT_APP_API_BASE_URL);
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
@@ -264,10 +264,6 @@ class ApiService {
         const lastWord = data.name.split(/\s+/).pop().replace(/[^a-zA-Z]/g, '');
         data.hotspotImage = `/City/Hotspot/${lastWord}.png`;
       }
-      // Special-case fix: L'Dweep asset name contains an apostrophe in public assets
-      if (slug === 'ldweep') {
-        data.hotspotImage = "/City/Hotspot/L'Dweep.png";
-      }
       return data;
     }
 
@@ -278,19 +274,6 @@ class ApiService {
     const matchedKey = Object.keys(formatted).find((k) => stripSpaces(k).includes(slugNoSpace));
     if (matchedKey) {
       return formatted[matchedKey];
-    }
-
-    // As a safety net, fall back to static city map for known cases like L'Dweep
-    const staticKey = slug === "ldweep" ? "ldweep" : slug;
-    if (citiesData && citiesData[staticKey]) {
-      const fallback = { ...citiesData[staticKey] };
-      // Correct hotspot image for L'Dweep specifically if using default placeholder
-      if (staticKey === 'ldweep') {
-        if (!fallback.hotspotImage || fallback.hotspotImage.endsWith('/image.png')) {
-          fallback.hotspotImage = "/City/Hotspot/L'Dweep.png";
-        }
-      }
-      return fallback;
     }
 
     throw new Error(`City "${requestedName}" not found in cached data`);
