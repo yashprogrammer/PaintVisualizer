@@ -1,0 +1,108 @@
+name: Deploy React to EC2 (no-downtime, keep nginx path)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        # If you need env vars for build, add them here via ${{ secrets.YOUR_VAR }}
+        run: npm run build
+
+      # Optional: precompress static assets for better performance (served by nginx if configured)
+      - name: Precompress assets (brotli + gzip)
+        run: |
+          sudo apt-get update && sudo apt-get install -y brotli
+          find build -type f \( -name '*.js' -o -name '*.css' \) -print0 | while IFS= read -r -d '' f; do
+            brotli -f -q 11 "$f" -o "$f.br"
+            gzip -f -k -9 "$f"
+          done
+
+      - name: Pack build
+        run: tar -czf build.tar.gz -C build .
+
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Upload + atomic switch
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          RELEASES_DIR: ${{ secrets.RELEASES_DIR }}
+          NGINX_ROOT_PATH: ${{ secrets.NGINX_ROOT_PATH }}
+        run: |
+          set -e
+          TS=$(date +"%Y-%m-%d_%H-%M-%S")
+
+          # 1) create a new release folder with a 'build' subfolder
+          ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "mkdir -p $RELEASES_DIR/$TS/build"
+
+          # 2) upload artifact
+          scp -o StrictHostKeyChecking=no -i key.pem build.tar.gz $EC2_USER@$EC2_HOST:$RELEASES_DIR/$TS/
+
+          # 3) unpack build inside the release and remove tar
+          ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "\
+            tar -xzf $RELEASES_DIR/$TS/build.tar.gz -C $RELEASES_DIR/$TS/build && \
+            rm $RELEASES_DIR/$TS/build.tar.gz \
+          "
+
+          # 4) atomically flip nginx root path (which we keep unchanged)
+          # We point /var/www/deluxcoloroftheworld -> /var/www/dcotw/releases/<TS>/build
+          ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "\
+            ln -sfn $RELEASES_DIR/$TS/build $NGINX_ROOT_PATH \
+          "
+
+      - name: Reload nginx (optional but recommended)
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          POST_DEPLOY_CMD: ${{ secrets.POST_DEPLOY_CMD }}
+        run: |
+          if [ -n "${POST_DEPLOY_CMD}" ]; then
+            ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "${POST_DEPLOY_CMD}"
+          fi
+
+      - name: Health check
+        # Replace with your real domain if you have one
+        run: |
+          URL="http://${{ secrets.EC2_HOST }}"
+          echo "Checking $URL ..."
+          for i in {1..10}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$code" = "200" ]; then
+              echo "OK"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $code, retrying in 3s..."
+            sleep 3
+          done
+          echo "Health check failed"
+          exit 1
+
+      - name: Cleanup old releases (keep last 5)
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          RELEASES_DIR: ${{ secrets.RELEASES_DIR }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "\
+            cd $RELEASES_DIR && ls -1t | tail -n +6 | xargs -r rm -rf \
+          "
