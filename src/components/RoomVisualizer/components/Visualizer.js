@@ -223,13 +223,57 @@ const Visualizer = ({
               const isSelected = selectedSurface === surface.id;
               const surfaceColor = surfaceColors[surface.id];
 
-              // If in pre-selection guidance, blink outlines for all walls
+              const overlays = [];
+
+              // Coloured mask overlay if painted
+              if (surfaceColor) {
+                overlays.push(
+                  <div
+                    key={`color-${surface.id}`}
+                    className={"absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl opacity-100"}
+                    style={{
+                      backgroundColor: surfaceColor,
+                      maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                      WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                      maskSize: 'cover',
+                      WebkitMaskSize: 'cover',
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      WebkitMaskPosition: 'center',
+                      mixBlendMode: 'multiply',
+                      zIndex: idx + 1,
+                      pointerEvents: 'none',
+                      display: loadedMask ? 'block' : 'none',
+                      transition: 'opacity 0.2s ease',
+                    }}
+                  />
+                );
+              }
+
+              // Outline path builder
+              const maskPath = surface.mask || '';
+              const lastSlash = maskPath.lastIndexOf('/');
+              const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
+              const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
+
+              // Selection outline if selected
+              if (isSelected) {
+                overlays.push(
+                  <img
+                    key={`sel-${surface.id}`}
+                    src={outlinePath}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+                    style={{ zIndex: 150, pointerEvents: 'none' }}
+                    draggable={false}
+                  />
+                );
+              }
+
+              // Pre-selection blink outline on top (applies to all surfaces)
               if (shouldBlinkSelection) {
-                const maskPath = surface.mask || '';
-                const lastSlash = maskPath.lastIndexOf('/');
-                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
-                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
-                return (
+                overlays.push(
                   <img
                     key={`blink-${surface.id}`}
                     src={outlinePath}
@@ -241,72 +285,10 @@ const Visualizer = ({
                 );
               }
 
-              // Nothing else to render if neither selected nor painted
-              if (!isSelected && !surfaceColor) return null;
+              // If nothing to show and not in blink mode, skip
+              if (!shouldBlinkSelection && overlays.length === 0) return null;
 
-              // If surface has paint applied, render the coloured mask overlay
-              if (surfaceColor) {
-                const styleObj = {
-                  backgroundColor: surfaceColor,
-                  maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
-                  WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
-                  maskSize: 'cover',
-                  WebkitMaskSize: 'cover',
-                  maskRepeat: 'no-repeat',
-                  WebkitMaskRepeat: 'no-repeat',
-                  maskPosition: 'center',
-                  WebkitMaskPosition: 'center',
-                  mixBlendMode: 'multiply',
-                  zIndex: idx + 1,
-                  pointerEvents: 'none',
-                  // Hide overlay if mask hasn't loaded to prevent full-image coloring
-                  display: loadedMask ? 'block' : 'none',
-                  transition: 'opacity 0.2s ease',
-                };
-                // Build outline path (so a selected painted wall still shows outline)
-                const maskPath = surface.mask || '';
-                const lastSlash = maskPath.lastIndexOf('/');
-                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
-                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
-                return (
-                  <React.Fragment key={surface.id}>
-                    <div
-                      className={"absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl opacity-100"}
-                      style={styleObj}
-                    />
-                    {isSelected && (
-                      <img
-                        src={outlinePath}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
-                        style={{ zIndex: 150, pointerEvents: 'none' }}
-                        draggable={false}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              }
-
-              // Selected but not painted → render the outline image overlay
-              if (isSelected) {
-                // Build outline image path based on the surface mask path to preserve URL encoding
-                const maskPath = surface.mask || '';
-                const lastSlash = maskPath.lastIndexOf('/');
-                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
-                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
-                return (
-                  <img
-                    key={surface.id}
-                    src={outlinePath}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
-                    style={{ zIndex: 150, pointerEvents: 'none' }}
-                    draggable={false}
-                  />
-                );
-              }
-
-              return null;
+              return <React.Fragment key={surface.id}>{overlays}</React.Fragment>;
             })}
             
             {/* Loading overlays */}
