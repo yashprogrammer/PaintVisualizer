@@ -23,6 +23,8 @@ jobs:
 
       - name: Build
         # add build-time envs here via env: if needed
+        env:
+          REACT_APP_API_URL: ${{secrets.REACT_APP_API_URL}}
         run: npm run build
 
       # Optional: precompress static assets for better performance (served by nginx if configured)
