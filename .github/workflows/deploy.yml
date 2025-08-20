@@ -22,7 +22,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        # If you need env vars for build, add them here via ${{ secrets.YOUR_VAR }}
+        # add build-time envs here via env: if needed
         run: npm run build
 
       # Optional: precompress static assets for better performance (served by nginx if configured)
@@ -49,10 +49,10 @@ jobs:
           RELEASES_DIR: ${{ secrets.RELEASES_DIR }}
           NGINX_ROOT_PATH: ${{ secrets.NGINX_ROOT_PATH }}
         run: |
-          set -e
+          set -euo pipefail
           TS=$(date +"%Y-%m-%d_%H-%M-%S")
 
-          # 1) create a new release folder with a 'build' subfolder
+          # 1) ensure release dir exists with correct perms
           ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "mkdir -p $RELEASES_DIR/$TS/build"
 
           # 2) upload artifact
@@ -64,10 +64,10 @@ jobs:
             rm $RELEASES_DIR/$TS/build.tar.gz \
           "
 
-          # 4) atomically flip nginx root path (which we keep unchanged)
-          # We point /var/www/deluxcoloroftheworld -> /var/www/dcotw/releases/<TS>/build
+          # 4) atomically flip nginx root path (needs sudo on /var/www)
+          # Make sure you added sudoers rule for $EC2_USER to run ln without password.
           ssh -o StrictHostKeyChecking=no -i key.pem $EC2_USER@$EC2_HOST "\
-            ln -sfn $RELEASES_DIR/$TS/build $NGINX_ROOT_PATH \
+            sudo ln -sfn $RELEASES_DIR/$TS/build $NGINX_ROOT_PATH \
           "
 
       - name: Reload nginx (optional but recommended)
@@ -81,7 +81,7 @@ jobs:
           fi
 
       - name: Health check
-        # Replace with your real domain if you have one
+        # replace with your domain if you have one
         run: |
           URL="http://${{ secrets.EC2_HOST }}"
           echo "Checking $URL ..."
