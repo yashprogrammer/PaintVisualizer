@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSpring, useTransition, animated, easings } from '@react-spring/web';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../services/api';
 
 const cities = [
@@ -18,10 +18,27 @@ const cities = [
 
 const CitySelector = () => {
   const navigate = useNavigate();
-  const [selectedIndex, setSelectedIndex] = useState(1);
-  const [displayedCityIndex, setDisplayedCityIndex] = useState(1); // controls the city name shown in text
+  const location = useLocation();
+  
+  // Function to find city index by name
+  const findCityIndex = (cityName) => {
+    if (!cityName) return 1; // Default to Egypt (index 1)
+    const normalizedCityName = cityName.toLowerCase().replace(/'/g, '');
+    const index = cities.findIndex(city => 
+      city.name.toLowerCase().replace(/'/g, '') === normalizedCityName
+    );
+    return index !== -1 ? index : 1; // Return found index or default to Egypt
+  };
+
+  // Determine initial selected city from navigation state or default to Egypt
+  const initialCityIndex = location.state?.selectedCity 
+    ? findCityIndex(location.state.selectedCity) 
+    : 1;
+
+  const [selectedIndex, setSelectedIndex] = useState(initialCityIndex);
+  const [displayedCityIndex, setDisplayedCityIndex] = useState(initialCityIndex); // controls the city name shown in text
   // Virtual index over an extended array with cloned edges for seamless loop
-  const [virtualIndex, setVirtualIndex] = useState(2);
+  const [virtualIndex, setVirtualIndex] = useState(initialCityIndex + 1);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHeart, setShowHeart] = useState(true);
   const [showText, setShowText] = useState(true);
@@ -289,10 +306,18 @@ const CitySelector = () => {
   // Build an extended list with clones for infinite scroll illusion
   const extendedCities = [cities[cities.length - 1], ...cities, cities[0]];
 
-  // Initialize position to center
+  // Initialize position to center on the selected city
   useEffect(() => {
-    setVirtualIndex(2); // start on Egypt (second real slide)
-  }, []);
+    setVirtualIndex(initialCityIndex + 1); // start on the selected city (accounting for cloned edge)
+  }, [initialCityIndex]);
+
+  // Clear navigation state after using it to prevent persistence across navigations
+  useEffect(() => {
+    if (location.state?.selectedCity) {
+      // Replace the current state entry to remove the selectedCity from history
+      window.history.replaceState(null, '', location.pathname);
+    }
+  }, [location.state, location.pathname]);
 
   // (Video src is controlled by transition rendering; no imperative src swap)
 
