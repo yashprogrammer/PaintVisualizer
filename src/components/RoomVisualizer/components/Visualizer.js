@@ -46,7 +46,7 @@ const Visualizer = ({
   }, []);
 
   
-
+  
   // Build optimized asset paths for src/srcSet
   const buildOptimized = React.useCallback((src) => {
     if (!src || typeof src !== 'string') return { lqip: src, medium: src, original: src };
@@ -61,6 +61,18 @@ const Visualizer = ({
     };
   }, []);
 
+  // Track base image loading so we can overlay a spinner until it's ready
+  const [isBaseLoaded, setIsBaseLoaded] = React.useState(false);
+  const basePathsRef = React.useRef(null);
+
+  React.useEffect(() => {
+    // Recompute paths and reset loading whenever room changes
+    const paths = buildOptimized(roomData[currentRoom].baseImage);
+    basePathsRef.current = paths;
+    setIsBaseLoaded(false);
+  }, [currentRoom, buildOptimized]);
+  
+
   return (
     <div className="visualizer-column column-2 column-padding flex flex-col items-center justify-start overflow-visible px-4 lg:px-[25px]  w-1/2 flex-shrink-0 min-h-[80vh] max-h-[95vh]">
       <div
@@ -73,13 +85,17 @@ const Visualizer = ({
         }}
       >
         <style jsx>{`
-          /* Always keep the visualizer box constrained by the base image aspect ratio */
+          /* Aspect ratio: only lock on large screens and above */
           .visualizer-aspect {
             width: 100%;
-            aspect-ratio: var(--vr, 16/9);
           }
-          .visualizer-aspect > .visualizer-box {
-            height: 100% !important;
+          @media (min-width: 1024px) {
+            .visualizer-aspect {
+              aspect-ratio: var(--vr, 16/9);
+            }
+            .visualizer-aspect > .visualizer-box {
+              height: 100% !important;
+            }
           }
           /* Responsive swatch sizing and padding so swatches don't squeeze the image */
           .swatch-size {
@@ -167,13 +183,25 @@ const Visualizer = ({
             </div>
             {/* Base room image */}
             <img 
-              src={buildOptimized(roomData[currentRoom].baseImage).medium}
-              srcSet={`${buildOptimized(roomData[currentRoom].baseImage).lqip} 20w, ${buildOptimized(roomData[currentRoom].baseImage).medium} 800w, ${buildOptimized(roomData[currentRoom].baseImage).original} 1600w`}
+              src={basePathsRef.current?.medium || buildOptimized(roomData[currentRoom].baseImage).medium}
+              srcSet={`${(basePathsRef.current?.lqip || buildOptimized(roomData[currentRoom].baseImage).lqip)} 20w, ${(basePathsRef.current?.medium || buildOptimized(roomData[currentRoom].baseImage).medium)} 800w, ${(basePathsRef.current?.original || buildOptimized(roomData[currentRoom].baseImage).original)} 1600w`}
               sizes="50vw"
               alt={`${roomData[currentRoom].name} base`}
               className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
               decoding="async"
               draggable={false}
+              loading="eager"
+              fetchpriority="high"
+              onLoad={() => setIsBaseLoaded(true)}
+              onError={(e) => {
+                // Fallback to original if optimized fails; if that fails too, hide overlay
+                const paths = basePathsRef.current || buildOptimized(roomData[currentRoom].baseImage);
+                if (e.currentTarget.src !== window.location.origin + paths.original && e.currentTarget.src !== paths.original) {
+                  e.currentTarget.src = paths.original;
+                } else {
+                  setIsBaseLoaded(true);
+                }
+              }}
             />
             
             {/* Mask overlays for each surface */}
@@ -214,14 +242,19 @@ const Visualizer = ({
               );
             })}
             
-            {/* Loading indicator */}
-            {!isMasksLoaded && (
-              <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center rounded-2xl lg:rounded-3xl">
-                <div className="bg-white px-4 py-2 rounded-lg text-sm font-medium font-brand">
-                  Loading masks...
+            {/* Loading overlays */}
+            {!isBaseLoaded ? (
+              <div className="absolute inset-0 z-[500] bg-white/70 flex items-center justify-center rounded-2xl lg:rounded-3xl">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin" />
+                  <div className="text-sm font-brand text-black/80">Loading image...</div>
                 </div>
               </div>
-            )}
+            ) : (!isMasksLoaded && (
+              <div className="absolute inset-0 z-[400] bg-black/20 flex items-center justify-center rounded-2xl lg:rounded-3xl">
+                <div className="bg-white px-4 py-2 rounded-lg text-sm font-medium font-brand">Loading masks...</div>
+              </div>
+            ))}
             
             {/* Selection indicator (hidden intentionally) */}
             
