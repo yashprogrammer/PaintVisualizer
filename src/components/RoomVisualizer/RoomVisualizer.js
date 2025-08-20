@@ -41,6 +41,8 @@ const RoomVisualizer = () => {
   });
   const [colorInfo, setColorInfo] = useState({});
   const [cityLabel, setCityLabel] = useState('');
+  // Step guidance: true once the user selects any surface at least once
+  const [hasSelectedSurfaceOnce, setHasSelectedSurfaceOnce] = useState(false);
 
   // Refs for canvas operations
   const containerRef = useRef(null);
@@ -144,7 +146,6 @@ const RoomVisualizer = () => {
 
         // Pre-apply the hotspot color to Wall 1 of the pre-selected room
         const targetSurfaceId = 'wall1';
-        setSelectedSurface(targetSurfaceId);
         setSurfaceColors(prev => ({
           ...prev,
           [currentRoom]: {
@@ -280,6 +281,7 @@ const RoomVisualizer = () => {
         const pixelData = ctx.getImageData(x, y, 1, 1).data;
         if (pixelData[3] > 0) { // Check alpha channel
           setSelectedSurface(surface.id);
+          setHasSelectedSurfaceOnce(true);
           return;
         }
       } catch (error) {
@@ -362,6 +364,7 @@ const RoomVisualizer = () => {
         const currentRoomData = roomData[currentRoom];
         if (currentRoomData?.surfaces && currentRoomData.surfaces[surfaceIndex]) {
           setSelectedSurface(currentRoomData.surfaces[surfaceIndex].id);
+          setHasSelectedSurfaceOnce(true);
         }
       }
       
@@ -610,6 +613,7 @@ const RoomVisualizer = () => {
           colorPalettes={colorPalettes}
           onColorPick={handleColorPick}
           cityName={cityLabel}
+          isIdleAnimationEnabled={hasSelectedSurfaceOnce}
           onBack={() => navigate('/city-selection')}
         />
         <Visualizer
@@ -628,6 +632,7 @@ const RoomVisualizer = () => {
           removePaint={removePaint}
           onClearAreas={clearCurrentRoomSurfaces}
           onShare={handleShare}
+          shouldBlinkSelection={!hasSelectedSurfaceOnce}
         />
         <RoomOptions
           currentRoom={currentRoom}

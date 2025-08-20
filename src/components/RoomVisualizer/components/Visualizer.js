@@ -15,6 +15,7 @@ const Visualizer = ({
   removePaint,
   isMasksLoaded,
   maskImagesRef,
+  shouldBlinkSelection = false,
   onClearAreas,
   onShare
 }) => {
@@ -89,6 +90,18 @@ const Visualizer = ({
           .visualizer-aspect {
             width: 100%;
           }
+          /* Blink animation for selection outlines */
+          @keyframes blinkOutline {
+            0%, 100% { opacity: 0.15; }
+            50% { opacity: 0.9; }
+          }
+          .blink-outline {
+            animation: blinkOutline 1.2s ease-in-out infinite;
+          }
+          .blink-outline.stagger-0 { animation-delay: 0s; }
+          .blink-outline.stagger-1 { animation-delay: 0.15s; }
+          .blink-outline.stagger-2 { animation-delay: 0.3s; }
+          .blink-outline.stagger-3 { animation-delay: 0.45s; }
           @media (min-width: 1024px) {
             .visualizer-aspect {
               aspect-ratio: var(--vr, 16/9);
@@ -204,42 +217,96 @@ const Visualizer = ({
               }}
             />
             
-            {/* Mask overlays for each surface */}
+            {/* Mask overlays and selection outlines for each surface */}
             {roomData[currentRoom].surfaces.map((surface, idx) => {
               const loadedMask = maskImagesRef.current[surface.id];
               const isSelected = selectedSurface === surface.id;
               const surfaceColor = surfaceColors[surface.id];
 
-              // Skip rendering if not selected and no colour applied yet
+              // If in pre-selection guidance, blink outlines for all walls
+              if (shouldBlinkSelection) {
+                const maskPath = surface.mask || '';
+                const lastSlash = maskPath.lastIndexOf('/');
+                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
+                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
+                return (
+                  <img
+                    key={`blink-${surface.id}`}
+                    src={outlinePath}
+                    alt=""
+                    className={`absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl blink-outline stagger-${idx % 4}`}
+                    style={{ zIndex: 160, pointerEvents: 'none' }}
+                    draggable={false}
+                  />
+                );
+              }
+
+              // Nothing else to render if neither selected nor painted
               if (!isSelected && !surfaceColor) return null;
 
-              const styleObj = {
-                backgroundColor: surfaceColor ? surfaceColor : (isSelected ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.001)'),
-                maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
-                WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
-                maskSize: 'cover',
-                WebkitMaskSize: 'cover',
-                maskRepeat: 'no-repeat',
-                WebkitMaskRepeat: 'no-repeat',
-                maskPosition: 'center',
-                WebkitMaskPosition: 'center',
-                mixBlendMode: surfaceColor ? 'multiply' : 'normal',
-                zIndex: isSelected ? 100 : idx + 1,
-                pointerEvents: 'none',
-                // Hide overlay if mask hasn't loaded to prevent full-image coloring
-                display: loadedMask ? 'block' : 'none',
-                transition: 'opacity 0.2s ease',
-              };
+              // If surface has paint applied, render the coloured mask overlay
+              if (surfaceColor) {
+                const styleObj = {
+                  backgroundColor: surfaceColor,
+                  maskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                  WebkitMaskImage: loadedMask ? `url(${loadedMask.src || surface.mask})` : 'none',
+                  maskSize: 'cover',
+                  WebkitMaskSize: 'cover',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskPosition: 'center',
+                  WebkitMaskPosition: 'center',
+                  mixBlendMode: 'multiply',
+                  zIndex: idx + 1,
+                  pointerEvents: 'none',
+                  // Hide overlay if mask hasn't loaded to prevent full-image coloring
+                  display: loadedMask ? 'block' : 'none',
+                  transition: 'opacity 0.2s ease',
+                };
+                // Build outline path (so a selected painted wall still shows outline)
+                const maskPath = surface.mask || '';
+                const lastSlash = maskPath.lastIndexOf('/');
+                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
+                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
+                return (
+                  <React.Fragment key={surface.id}>
+                    <div
+                      className={"absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl opacity-100"}
+                      style={styleObj}
+                    />
+                    {isSelected && (
+                      <img
+                        src={outlinePath}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+                        style={{ zIndex: 150, pointerEvents: 'none' }}
+                        draggable={false}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              }
 
-              const overlayOpacityClass = surfaceColor ? 'opacity-100' : (isSelected ? 'opacity-100' : 'opacity-80');
+              // Selected but not painted → render the outline image overlay
+              if (isSelected) {
+                // Build outline image path based on the surface mask path to preserve URL encoding
+                const maskPath = surface.mask || '';
+                const lastSlash = maskPath.lastIndexOf('/');
+                const dir = lastSlash !== -1 ? maskPath.substring(0, lastSlash) : '';
+                const outlinePath = dir ? `${dir}/outline_${surface.id}.png` : '';
+                return (
+                  <img
+                    key={surface.id}
+                    src={outlinePath}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover rounded-2xl lg:rounded-3xl"
+                    style={{ zIndex: 150, pointerEvents: 'none' }}
+                    draggable={false}
+                  />
+                );
+              }
 
-              return (
-                <div
-                  key={surface.id}
-                  className={`absolute inset-0 w-full h-full rounded-2xl lg:rounded-3xl ${overlayOpacityClass}`}
-                  style={styleObj}
-                />
-              );
+              return null;
             })}
             
             {/* Loading overlays */}
@@ -262,7 +329,7 @@ const Visualizer = ({
             </div>
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand w-full flex items-center justify-between px-6">
-            <p className="block leading-normal">Select surface to paint</p>
+            <p className="block leading-normal">{shouldBlinkSelection ? 'Select the wall you want to paint.' : 'Explore the colour lockups to find the perfect match.'}</p>
             <button
               type="button"
               onClick={onShare}
