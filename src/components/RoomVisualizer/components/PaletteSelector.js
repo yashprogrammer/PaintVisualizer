@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {}, cityName = '', onBack = () => {} }) => {
+const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColorPick = () => {}, cityName = '', onBack = () => {}, isIdleAnimationEnabled = false }) => {
   const [svgContent, setSvgContent] = React.useState({ 1: null, 2: null });
   const paletteRefs = { 1: React.useRef(null), 2: React.useRef(null) };
   const userInteractedRef = React.useRef(false);
@@ -231,16 +231,20 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
     }
   }, [computeAnimationOrder]);
 
-  // Idle loop: animate vibrant (1) then cool (2), repeat until user interacts
+  // Idle loop: animate vibrant (1) then cool (2), gated by isIdleAnimationEnabled
   React.useEffect(() => {
-    if (userInteractedRef.current) return;
-    if (!svgContent[1] || !svgContent[2]) return; // wait until svgs are injected
-    isAnimatingRef.current = true;
     let cancelled = false;
+    // If animation is disabled or svg not ready, ensure stopped
+    if (!isIdleAnimationEnabled || userInteractedRef.current || !svgContent[1] || !svgContent[2]) {
+      isAnimatingRef.current = false;
+      stopIdleAnimation();
+      return () => { cancelled = true; };
+    }
+    isAnimatingRef.current = true;
     const run = async () => {
       while (!cancelled && isAnimatingRef.current && !userInteractedRef.current) {
         await animatePaletteOnce(1);
-        if (cancelled || userInteractedRef.current) break;
+        if (cancelled || !isIdleAnimationEnabled || userInteractedRef.current) break;
         await animatePaletteOnce(2);
       }
     };
@@ -249,7 +253,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
       cancelled = true;
       stopIdleAnimation();
     };
-  }, [svgContent, animatePaletteOnce, stopIdleAnimation]);
+  }, [svgContent, animatePaletteOnce, stopIdleAnimation, isIdleAnimationEnabled]);
 
   const renderPaletteSvg = (paletteId, altText) => {
     const html = svgContent[paletteId];
