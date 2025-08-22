@@ -344,7 +344,7 @@ const HotspotSelector = () => {
             className="text-black font-bold text-center font-brand whitespace-nowrap"
             style={taglineStyles.text}
           >
-            TAP A PAINT TONE HOTSPOT TO CONTINUE
+            Tap The hue to continue
           </p>
         </div>
       </div>

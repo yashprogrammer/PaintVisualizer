@@ -864,7 +864,7 @@ const CitySelector = () => {
           >
             <p className="text-black font-bold tracking-widest text-center font-brand"
                style={{ fontSize: `${clampNumber(12, viewportWidth * 0.014, 20)}px`, whiteSpace: 'nowrap' }}>
-              CHOOSE A LOCATION TO EXPLORE ITS UNIQUE PAINT TONES.
+              Choose your favourite destination
             </p>
           </div>
         </div>
