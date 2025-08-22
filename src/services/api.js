@@ -1,8 +1,8 @@
 // API service for communicating with ColorsWorld backend
 import axios from 'axios';
-import { citiesData } from '../data/cities';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:15205/api/v1';
+console.log('REACT_APP_API_BASE_URL:', process.env.REACT_APP_API_BASE_URL);
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
@@ -263,46 +263,53 @@ class ApiService {
   static async getCityData(requestedName) {
     const slug = normalizeCitySlug(requestedName);
     const formatted = await this.getFormattedCountries();
-
-    // Direct match first
+  
+    // 1) Direct match
     if (formatted[slug]) {
       const data = { ...formatted[slug] };
+  
       // Ensure hotspotImage isn't the default image.png
       if (data.hotspotImage?.endsWith('/image.png')) {
         const lastWord = data.name.split(/\s+/).pop().replace(/[^a-zA-Z]/g, '');
         data.hotspotImage = `/City/Hotspot/${lastWord}.png`;
       }
+  
       // Ensure Lakshwadeep hotspot path is correct
       if (slug === 'lakshwadeep') {
         data.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
       }
-      return data;
+  
+      return data; // ✅ return on exact match
     }
-
-    // Fallback: look for key that contains the requested slug ignoring spaces
+  
+    // 2) Fuzzy key match (ignore spaces)
     const stripSpaces = (s) => s.replace(/\s+/g, '');
     const slugNoSpace = stripSpaces(slug);
-
-    const matchedKey = Object.keys(formatted).find((k) => stripSpaces(k).includes(slugNoSpace));
+  
+    const matchedKey = Object.keys(formatted).find((k) =>
+      stripSpaces(k).includes(slugNoSpace)
+    );
     if (matchedKey) {
       return formatted[matchedKey];
     }
-
-    // As a safety net, fall back to static city map for known cases like L'Dweep
-    const staticKey = slug;
-    if (citiesData && citiesData[staticKey]) {
-      const fallback = { ...citiesData[staticKey] };
-      // Correct hotspot image for Lakshwadeep if using default placeholder
-      if (staticKey === 'lakshwadeep') {
-        if (!fallback.hotspotImage || fallback.hotspotImage.endsWith('/image.png')) {
-          fallback.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
-        }
+  
+    // 3) Safety net: alias fallback for known cases like L'Dweep/Lakshadweep → lakshwadeep
+    const aliasMap = { ldweep: 'lakshwadeep', lakshadweep: 'lakshwadeep' };
+    const aliasKey = aliasMap[slug];
+    if (aliasKey && formatted[aliasKey]) {
+      const fallback = { ...formatted[aliasKey] };
+      if (!fallback.hotspotImage || fallback.hotspotImage.endsWith('/image.png')) {
+        fallback.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
       }
       return fallback;
     }
-
+  
+    // 4) Nothing found
     throw new Error(`City "${requestedName}" not found in cached data`);
   }
+  
+
+
 }
 
 export default ApiService;
