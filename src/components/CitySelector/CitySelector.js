@@ -10,7 +10,7 @@ const cities = [
   { name: 'Greece', image: '/City/Greece H Small.png', blurredImage: '/City/Blurred/Greece H Small.jpg', video: '/City/SelectionTransition/Greece.mp4' },
   { name: 'Japan', image: '/City/Japan H Small.png', blurredImage: '/City/Blurred/Japan H Small.jpg', video: '/City/SelectionTransition/Japan.mp4' },
   { name: 'Kenya', image: '/City/Kenya H Small.png', blurredImage: '/City/Blurred/Kenya H Small.jpg', video: '/City/SelectionTransition/Kenya.mp4' },
-  { name: 'L\'Dweep', image: '/City/L\'Dweep H Small.png', blurredImage: '/City/Blurred/L\'Dweep H Small.jpg', video: '/City/SelectionTransition/L\'Dweep.mp4' },
+  { name: 'Lakshwadeep', image: '/City/Lakshwadeep H Small.png', blurredImage: '/City/Blurred/Lakshwadeep H Small.jpg', video: '/City/SelectionTransition/Lakshwadeep.mp4' },
   { name: 'Morocco', image: '/City/Morocco H Small.png', blurredImage: '/City/Blurred/Morocco H Small.jpg', video: '/City/SelectionTransition/Morocco.mp4' },
   { name: 'Spain', image: '/City/Spain H Small.png', blurredImage: '/City/Blurred/Spain H Small.jpg', video: '/City/SelectionTransition/Spain.mp4' },
   { name: 'Vietnam', image: '/City/Vietnam H Small.png', blurredImage: '/City/Blurred/Vietnam H Small.jpg', video: '/City/SelectionTransition/Vietnam.mp4' },
@@ -283,14 +283,15 @@ const CitySelector = () => {
     if (!name || typeof name !== 'string') return 1;
     const key = name.trim().toLowerCase();
     if (key === 'morocco') return 0.9; // 7% smaller
-    if (key === "l'dweep" || key === 'lakshadweep') return 0.6; // reduce to fit
+    if (key === 'lakshwadeep') return 0.6; // reduce to fit
     return 1;
   };
 
   // Display helper to expand short labels in UI without changing keys/routes
   const getDisplayCityName = (name) => {
     if (!name) return '';
-    return name === "L'Dweep" ? 'Lakshadweep' : name;
+    if (name === "L'Dweep" || name === 'Lakshadweep') return 'Lakshwadeep';
+    return name;
   };
 
   // Logo sizing responsive to both width and height

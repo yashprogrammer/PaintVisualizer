@@ -57,6 +57,14 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Utility: normalize external city inputs to canonical slugs
+const normalizeCitySlug = (input) => {
+  if (!input || typeof input !== 'string') return '';
+  const slug = input.toLowerCase().replace(/['\s-]+/g, '').trim();
+  if (slug === 'ldweep' || slug === 'lakshadweep') return 'lakshwadeep';
+  return slug;
+};
+
 class ApiService {
   // Cache for storing API data to avoid repeated calls
   static _countriesCache = null;
@@ -153,9 +161,9 @@ class ApiService {
    * @returns {Object} Formatted country data for frontend
    */
   static transformCountryData(backendCountry) {
-    // Handle special case for L'Dweep naming
+    // Normalize to canonical slug (maps ldweep/l'dweep/lakshadweep -> lakshwadeep)
     const normalizedName = backendCountry.name.toLowerCase().replace(/'/g, '');
-    const cityKey = normalizedName === 'ldweep' ? 'ldweep' : normalizedName;
+    const cityKey = normalizeCitySlug(normalizedName);
 
     // Transform hotspots from the combined vibrant and calm colors
     // Note: The x,y coordinates from backend are in pixels, convert to percentages
@@ -253,7 +261,7 @@ class ApiService {
   }
 
   static async getCityData(requestedName) {
-    const slug = requestedName.toLowerCase().replace(/'/g, '').trim();
+    const slug = normalizeCitySlug(requestedName);
     const formatted = await this.getFormattedCountries();
 
     // Direct match first
@@ -264,9 +272,9 @@ class ApiService {
         const lastWord = data.name.split(/\s+/).pop().replace(/[^a-zA-Z]/g, '');
         data.hotspotImage = `/City/Hotspot/${lastWord}.png`;
       }
-      // Special-case fix: L'Dweep asset name contains an apostrophe in public assets
-      if (slug === 'ldweep') {
-        data.hotspotImage = "/City/Hotspot/L'Dweep.png";
+      // Ensure Lakshwadeep hotspot path is correct
+      if (slug === 'lakshwadeep') {
+        data.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
       }
       return data;
     }
@@ -281,13 +289,13 @@ class ApiService {
     }
 
     // As a safety net, fall back to static city map for known cases like L'Dweep
-    const staticKey = slug === "ldweep" ? "ldweep" : slug;
+    const staticKey = slug;
     if (citiesData && citiesData[staticKey]) {
       const fallback = { ...citiesData[staticKey] };
-      // Correct hotspot image for L'Dweep specifically if using default placeholder
-      if (staticKey === 'ldweep') {
+      // Correct hotspot image for Lakshwadeep if using default placeholder
+      if (staticKey === 'lakshwadeep') {
         if (!fallback.hotspotImage || fallback.hotspotImage.endsWith('/image.png')) {
-          fallback.hotspotImage = "/City/Hotspot/L'Dweep.png";
+          fallback.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
         }
       }
       return fallback;
