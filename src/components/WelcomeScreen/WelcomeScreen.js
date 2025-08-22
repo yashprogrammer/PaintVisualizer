@@ -588,8 +588,8 @@ const WelcomeScreen = () => {
     const TAP_THRESHOLD = 0.4;
     const shouldShowTapInstruction = progress >= TAP_THRESHOLD || animationCompleted;
     const newText = shouldShowTapInstruction 
-      ? "TAP THE HEART TO EXPLORE PALLETTES FROM AROUND THE GLOBE"
-      : "TURNING MEMORIES OF PLACES INTO SHADES YOU CAN FEEL.";
+      ? "Tap the Heart to Explore"
+      : "Turning memories of places into shades you can feel.";
     
     // Only animate if text actually changes
     if (currentTaglineText !== newText) {
