@@ -236,9 +236,9 @@ export const citiesData = {
       calm: ["#E8E4DE", "#C4BBBC", "#B8B5A8", "#9B968E"]
     }
   },
-  ldweep: {
-    name: "L'Dweep",
-    hotspotImage: "/City/Hotspot/image.png",
+  lakshwadeep: {
+    name: "Lakshwadeep",
+    hotspotImage: "/City/Hotspot/Lakshwadeep.png",
     videos: ["/City/Video/Video.mp4"],
     hotspots: [
       { 
@@ -401,9 +401,9 @@ export const getCityData = (cityName) => {
   // Normalize city name and handle special cases
   const normalizedName = cityName.toLowerCase().trim();
   
-  // Handle special case for L'Dweep
-  if (normalizedName === "l'dweep" || normalizedName === "ldweep") {
-    return citiesData.ldweep;
+  // Map variants to the canonical key 'lakshwadeep'
+  if (normalizedName === "l'dweep" || normalizedName === "ldweep" || normalizedName === "lakshadweep" || normalizedName === "lakshwadeep") {
+    return citiesData.lakshwadeep;
   }
   
   return citiesData[normalizedName] || null;

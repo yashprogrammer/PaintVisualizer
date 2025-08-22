@@ -57,6 +57,14 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Utility: normalize external city inputs to canonical slugs
+const normalizeCitySlug = (input) => {
+  if (!input || typeof input !== 'string') return '';
+  const slug = input.toLowerCase().replace(/['\s-]+/g, '').trim();
+  if (slug === 'ldweep' || slug === 'lakshadweep') return 'lakshwadeep';
+  return slug;
+};
+
 class ApiService {
   // Cache for storing API data to avoid repeated calls
   static _countriesCache = null;
@@ -153,9 +161,9 @@ class ApiService {
    * @returns {Object} Formatted country data for frontend
    */
   static transformCountryData(backendCountry) {
-    // Handle special case for L'Dweep naming
+    // Normalize to canonical slug (maps ldweep/l'dweep/lakshadweep -> lakshwadeep)
     const normalizedName = backendCountry.name.toLowerCase().replace(/'/g, '');
-    const cityKey = normalizedName === 'ldweep' ? 'ldweep' : normalizedName;
+    const cityKey = normalizeCitySlug(normalizedName);
 
     // Transform hotspots from the combined vibrant and calm colors
     // Note: The x,y coordinates from backend are in pixels, convert to percentages
@@ -253,31 +261,55 @@ class ApiService {
   }
 
   static async getCityData(requestedName) {
-    const slug = requestedName.toLowerCase().replace(/'/g, '').trim();
+    const slug = normalizeCitySlug(requestedName);
     const formatted = await this.getFormattedCountries();
-
-    // Direct match first
+  
+    // 1) Direct match
     if (formatted[slug]) {
       const data = { ...formatted[slug] };
+  
       // Ensure hotspotImage isn't the default image.png
       if (data.hotspotImage?.endsWith('/image.png')) {
         const lastWord = data.name.split(/\s+/).pop().replace(/[^a-zA-Z]/g, '');
         data.hotspotImage = `/City/Hotspot/${lastWord}.png`;
       }
-      return data;
+  
+      // Ensure Lakshwadeep hotspot path is correct
+      if (slug === 'lakshwadeep') {
+        data.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
+      }
+  
+      return data; // ✅ return on exact match
     }
-
-    // Fallback: look for key that contains the requested slug ignoring spaces
+  
+    // 2) Fuzzy key match (ignore spaces)
     const stripSpaces = (s) => s.replace(/\s+/g, '');
     const slugNoSpace = stripSpaces(slug);
-
-    const matchedKey = Object.keys(formatted).find((k) => stripSpaces(k).includes(slugNoSpace));
+  
+    const matchedKey = Object.keys(formatted).find((k) =>
+      stripSpaces(k).includes(slugNoSpace)
+    );
     if (matchedKey) {
       return formatted[matchedKey];
     }
-
+  
+    // 3) Safety net: alias fallback for known cases like L'Dweep/Lakshadweep → lakshwadeep
+    const aliasMap = { ldweep: 'lakshwadeep', lakshadweep: 'lakshwadeep' };
+    const aliasKey = aliasMap[slug];
+    if (aliasKey && formatted[aliasKey]) {
+      const fallback = { ...formatted[aliasKey] };
+      if (!fallback.hotspotImage || fallback.hotspotImage.endsWith('/image.png')) {
+        fallback.hotspotImage = "/City/Hotspot/Lakshwadeep.png";
+      }
+      return fallback;
+    }
+  
+    // 4) Nothing found
     throw new Error(`City "${requestedName}" not found in cached data`);
   }
+  
+
+
 }
 
 export default ApiService;

@@ -289,7 +289,7 @@ const WelcomeScreen = () => {
       { name: 'Greece', path: '/City/SelectionTransition/Greece.mp4' },
       { name: 'Japan', path: '/City/SelectionTransition/Japan.mp4' },
       { name: 'Kenya', path: '/City/SelectionTransition/Kenya.mp4' },
-      { name: "L'Dweep", path: '/City/SelectionTransition/L\'Dweep.mp4' },
+      { name: 'Lakshwadeep', path: '/City/SelectionTransition/Lakshwadeep.mp4' },
       { name: 'Morocco', path: '/City/SelectionTransition/Morocco.mp4' },
       { name: 'Spain', path: '/City/SelectionTransition/Spain.mp4' },
       { name: 'Vietnam', path: '/City/SelectionTransition/Vietnam.mp4' },

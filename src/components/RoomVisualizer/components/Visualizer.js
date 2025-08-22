@@ -327,7 +327,7 @@ const Visualizer = ({
                 Share
               </button>
             </div>
-            <p className="block leading-normal justify-self-center text-center w-full">{shouldBlinkSelection ? 'Select surface to paint' : 'Explore the colour lockups to find the perfect match.'}</p>
+            <p className="block leading-normal justify-self-center text-center w-full">{shouldBlinkSelection ? 'Select the wall you want to paint.' : 'Explore the colour lockups to find the perfect match.'}</p>
             <button
               type="button"
               onClick={onShare}
