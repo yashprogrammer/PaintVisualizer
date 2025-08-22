@@ -282,8 +282,15 @@ const CitySelector = () => {
   const getCityFontScale = (name) => {
     if (!name || typeof name !== 'string') return 1;
     const key = name.trim().toLowerCase();
-    if (key === 'morocco') return 0.93; // 7% smaller
+    if (key === 'morocco') return 0.9; // 7% smaller
+    if (key === "l'dweep" || key === 'lakshadweep') return 0.6; // reduce to fit
     return 1;
+  };
+
+  // Display helper to expand short labels in UI without changing keys/routes
+  const getDisplayCityName = (name) => {
+    if (!name) return '';
+    return name === "L'Dweep" ? 'Lakshadweep' : name;
   };
 
   // Logo sizing responsive to both width and height
@@ -693,7 +700,7 @@ const CitySelector = () => {
                       className="cursor-pointer text-white flex flex-col items-center justify-center"
                     >
                       <h1 className=" tracking-wider select-none flex flex-column items-center text-gray-800" style={{ fontSize: `${Math.round(cityFontPx * getCityFontScale(cities[item].name))}px`, lineHeight: 1, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>
-                        {cities[item].name.toUpperCase()}
+                        {getDisplayCityName(cities[item].name).toUpperCase()}
                       </h1>
                      <p className="font-light tracking-[0.3em] select-none text-gray-800 font-brand" style={{ fontSize: `${exploreFontPx}px`, textShadow: '1px 0 0 white, -1px 0 0 white, 0 1px 0 white, 0 -1px 0 white' }}>EXPLORE</p>
                     </animated.div>
