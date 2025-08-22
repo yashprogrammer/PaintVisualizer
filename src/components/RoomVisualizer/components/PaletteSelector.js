@@ -304,14 +304,14 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
         /* Hover elevation effect for individual SVG paths */
         .lockup-svg path.hover-elevate {
           transform: translateY(-3px);
-          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.07));
           transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
         
         /* Auto-animation elevation effect (existing) */
         .lockup-svg path.idle-elevate {
           transform: translateY(-6px);
-          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.07));
           transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
         
@@ -324,7 +324,7 @@ const PaletteSelector = ({ currentPalette, selectPalette, colorPalettes, onColor
         /* Ensure idle animation takes priority over hover */
         .lockup-svg path.idle-elevate.hover-elevate {
           transform: translateY(-6px);
-          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+          filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.07));
         }
       `}</style>
       <div
