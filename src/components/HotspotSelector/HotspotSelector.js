@@ -105,6 +105,13 @@ const HotspotSelector = () => {
         return;
       }
 
+      // Persist selected city for browser back navigation to restore selection
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('selectedCity', sanitizedCity);
+        }
+      } catch (_) {}
+
       // If we were navigated with preloaded data, use it and skip fetching
       if (location.state && location.state.cityData) {
         setCityData(location.state.cityData);
@@ -143,6 +150,22 @@ const HotspotSelector = () => {
 
     fetchCityData();
   }, [city, location.state]);
+
+  // Intercept browser back to route user to City Selector with preserved selection
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    // Push a sentinel entry so the first back stays on this page and triggers popstate
+    try { window.history.pushState({ hotspotGuard: true }, ''); } catch (_) {}
+    const sanitizedCity = (city || '').replace(/[<>/"'&]/g, '').toLowerCase().trim();
+    const handlePop = () => {
+      try { sessionStorage.setItem('selectedCity', sanitizedCity); } catch (_) {}
+      navigate('/city-selection', { state: { selectedCity: sanitizedCity } });
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => {
+      window.removeEventListener('popstate', handlePop);
+    };
+  }, [city, navigate]);
 
   // Compute a filtered list of hotspots where overlapping points are deduplicated
   useEffect(() => {

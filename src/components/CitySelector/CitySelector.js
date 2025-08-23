@@ -30,10 +30,23 @@ const CitySelector = () => {
     return index !== -1 ? index : 1; // Return found index or default to Egypt
   };
 
-  // Determine initial selected city from navigation state or default to Egypt
+  const getStoredCity = () => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const value = sessionStorage.getItem('selectedCity');
+      return value || null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // Determine initial selected city from navigation state, then storage, else default to Egypt
   const initialCityIndex = location.state?.selectedCity 
     ? findCityIndex(location.state.selectedCity) 
-    : 1;
+    : (() => {
+        const stored = getStoredCity();
+        return stored ? findCityIndex(stored) : 1;
+      })();
 
   const [selectedIndex, setSelectedIndex] = useState(initialCityIndex);
   const [displayedCityIndex, setDisplayedCityIndex] = useState(initialCityIndex); // controls the city name shown in text
@@ -318,6 +331,17 @@ const CitySelector = () => {
   useEffect(() => {
     setVirtualIndex(initialCityIndex + 1); // start on the selected city (accounting for cloned edge)
   }, [initialCityIndex]);
+
+  // Keep session storage in sync with current selected city
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const name = cities[selectedIndex]?.name || '';
+        const sanitized = name.toLowerCase().replace(/'/g, '');
+        if (sanitized) sessionStorage.setItem('selectedCity', sanitized);
+      }
+    } catch (_) {}
+  }, [selectedIndex]);
 
   // Clear navigation state after using it to prevent persistence across navigations
   useEffect(() => {

@@ -51,6 +51,16 @@ const RoomVisualizer = () => {
   const [isMasksLoaded, setIsMasksLoaded] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
+  // Persist selected city for restoring selection on browser back
+  useEffect(() => {
+    try {
+      const sanitizedCity = city?.toLowerCase().replace(/'/g,'').trim();
+      if (sanitizedCity && typeof window !== 'undefined') {
+        sessionStorage.setItem('selectedCity', sanitizedCity);
+      }
+    } catch (_) {}
+  }, [city]);
+
   // Function to extract colors from SVG content
   const extractColorsFromSVG = (svgContent) => {
     const fillRegex = /fill="([^"]+)"/g;
