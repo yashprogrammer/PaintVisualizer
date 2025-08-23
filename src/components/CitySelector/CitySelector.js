@@ -297,7 +297,7 @@ const CitySelector = () => {
   // Logo sizing responsive to both width and height
   const logoWidthPx = clampNumber(64, Math.min(viewportWidth * 0.11, viewportHeight * 0.14), 220);
   const logoTopPx = clampNumber(8, viewportHeight * 0.02, 32);
-  const logoRightPx = clampNumber(8, viewportWidth * 0.02, 40);
+  const logoLeftPx = clampNumber(8, viewportWidth * 0.02, 40);
 
   // Always use low-quality variant for heart video (fallback to original if missing)
   const getPrioritizedVideoSources = (city) => {
@@ -568,7 +568,7 @@ const CitySelector = () => {
         decoding="async"
       />
 
-      <div className="absolute z-20" style={{ top: `${logoTopPx}px`, right: `${logoRightPx}px` }}>
+      <div className="absolute z-20" style={{ top: `${logoTopPx}px`, left: `${logoLeftPx}px` }}>
         <img src='/Dulux.png' alt="Colours of the World" style={{ width: `${logoWidthPx}px` }}/>
       </div>
 
