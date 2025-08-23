@@ -19,6 +19,9 @@ const Visualizer = ({
   onClearAreas,
   onShare
 }) => {
+  // State for Protip visibility
+  const [isProtipExpanded, setIsProtipExpanded] = React.useState(true);
+  
   // Maintain base image aspect ratio on small viewports (landscape mobile)
   // Landscape scaling (mobile) relative to FHD baseline
   const [landscapeScale, setLandscapeScale] = React.useState(1);
@@ -45,6 +48,9 @@ const Visualizer = ({
       window.removeEventListener('orientationchange', updateScale);
     };
   }, []);
+
+  // Determine if Protip should be visible based on instruction
+  const showProtip = !shouldBlinkSelection; // Show on second instruction, hide on first
 
   
   
@@ -343,26 +349,56 @@ const Visualizer = ({
               Share
             </button>
           </div>
-          {/* Pro tip row below instruction and share */}
-          <div className="w-full px-6 mt-0 lg:mt-1">
-            <div className="w-full max-w-[1100px] mx-auto bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 lg:px-5 lg:py-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-              <div className="flex items-start gap-3">
-                <span className="inline-flex items-center justify-center rounded-full bg-amber-100 p-[clamp(6px,1vmin,10px)] shrink-0">
-                  <img
-                    src="/bulb-creative-idea-svgrepo-com.svg"
-                    alt="Pro tip"
-                    className="w-[clamp(18px,1.6vmin,24px)] h-[clamp(18px,1.6vmin,24px)] object-contain block"
-                    draggable={false}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </span>
-                <p className="m-0 text-[#575454] font-brand italic leading-snug text-[clamp(10px,1.9vmin,16px)]">
-                  For a soft and subtle look, stick with shades A–D. For a bold and vibrant look, start with E or F, then mix in shades from A to D to balance it out.
-                </p>
+          {/* Pro tip row below instruction and share - only show on second instruction */}
+          {showProtip && (
+            <div className="w-full px-6 mt-0 lg:mt-1">
+              <div className="w-full max-w-[1100px] mx-auto bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 lg:px-5 lg:py-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+                <div className="flex items-start gap-3">
+                  <span 
+                    className="inline-flex items-center justify-center rounded-full bg-amber-100 p-[clamp(6px,1vmin,10px)] shrink-0 cursor-pointer"
+                    onClick={() => setIsProtipExpanded(!isProtipExpanded)}
+                    title={isProtipExpanded ? "Collapse tip" : "Expand tip"}
+                  >
+                    <img
+                      src="/bulb-creative-idea-svgrepo-com.svg"
+                      alt="Pro tip"
+                      className="w-[clamp(18px,1.6vmin,24px)] h-[clamp(18px,1.6vmin,24px)] object-contain block"
+                      draggable={false}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </span>
+                  {isProtipExpanded && (
+                    <>
+                      <p className="m-0 text-[#575454] font-brand italic leading-snug text-[clamp(10px,1.9vmin,16px)]">
+                        For a soft and subtle look, stick with shades A–D. For a bold and vibrant look, start with E or F, then mix in shades from A to D to balance it out.
+                      </p>
+                      <button
+                        onClick={() => setIsProtipExpanded(false)}
+                        className="ml-auto text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                        title="Close tip"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           
           
