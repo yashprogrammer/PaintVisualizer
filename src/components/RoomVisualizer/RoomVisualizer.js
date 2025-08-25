@@ -513,7 +513,9 @@ const RoomVisualizer = () => {
 
       // Helpers to match on-screen rendering
       const getCoverRect = (imgW, imgH, box) => {
-        const arImg = imgW / imgH;
+        const safeW = Number.isFinite(imgW) && imgW > 0 ? imgW : 1;
+        const safeH = Number.isFinite(imgH) && imgH > 0 ? imgH : 1;
+        const arImg = safeW / safeH;
         const arBox = box.w / box.h;
         let dw = box.w;
         let dh = box.h;
@@ -531,6 +533,32 @@ const RoomVisualizer = () => {
           dy = box.y - (dh - box.h) / 2;
         }
         return { dx, dy, dw, dh };
+      };
+
+      const getIntrinsicSize = (img) => {
+        if (!img) return { w: 1, h: 1 };
+        const w = Number.isFinite(img.naturalWidth) && img.naturalWidth > 0 ? img.naturalWidth : (Number.isFinite(img.width) && img.width > 0 ? img.width : 1);
+        const h = Number.isFinite(img.naturalHeight) && img.naturalHeight > 0 ? img.naturalHeight : (Number.isFinite(img.height) && img.height > 0 ? img.height : 1);
+        return { w, h };
+      };
+
+      const safeInt = (val, fallback) => {
+        return Number.isFinite(val) && val > 0 ? Math.round(val) : Math.round(fallback > 0 ? fallback : 1);
+      };
+
+      // Ensure a given image is fully loaded with intrinsic dimensions
+      const ensureImageReady = (img, src) => {
+        return new Promise((resolve) => {
+          if (img && img.complete && (img.naturalWidth > 0 || img.width > 0)) {
+            resolve(img);
+            return;
+          }
+          const loader = new Image();
+          loader.crossOrigin = 'anonymous';
+          loader.onload = () => resolve(loader);
+          loader.onerror = () => resolve(null);
+          loader.src = (img && img.src) || src || '';
+        });
       };
 
       const clipRoundedRect = (context, box, radius) => {
@@ -588,6 +616,7 @@ const RoomVisualizer = () => {
       };
 
       // Draw base image, fit within imageArea keeping aspect ratio (cover)
+      let baseDrawRect = null;
       await new Promise((resolve) => {
         const baseImg = new Image();
         baseImg.crossOrigin = 'anonymous';
@@ -596,7 +625,9 @@ const RoomVisualizer = () => {
           // Rounded corners like UI
           const r = 18;
           clipRoundedRect(ctx, imageArea, r);
-          const { dx, dy, dw, dh } = getCoverRect(baseImg.width, baseImg.height, imageArea);
+          const { w: bw, h: bh } = getIntrinsicSize(baseImg);
+          const { dx, dy, dw, dh } = getCoverRect(bw, bh, imageArea);
+          baseDrawRect = { dx, dy, dw, dh };
           ctx.drawImage(baseImg, dx, dy, dw, dh);
           ctx.restore();
           resolve();
@@ -610,30 +641,45 @@ const RoomVisualizer = () => {
       const surfaces = currentRoomData?.surfaces || [];
       for (const surface of surfaces) {
         const color = (surfaceColors[currentRoom] || {})[surface.id];
-        const maskImg = maskImagesRef.current[surface.id];
-        if (!color || !maskImg) continue;
+        const existingMask = maskImagesRef.current[surface.id];
+        if (!color || !existingMask) continue;
+
+        // Ensure mask is actually decoded and has intrinsic size on iOS/Safari
+        // If the decoded image fails, skip this surface gracefully
+        // eslint-disable-next-line no-await-in-loop
+        const readyMask = await ensureImageReady(existingMask, surface.mask);
+        if (!readyMask) continue;
 
         // Compute the same cover + center-crop rectangle for the mask
-        const { dx, dy, dw, dh } = getCoverRect(maskImg.width, maskImg.height, imageArea);
+        const rect = baseDrawRect || (() => {
+          const { w: mw, h: mh } = getIntrinsicSize(readyMask);
+          return getCoverRect(mw, mh, imageArea);
+        })();
+        const { dx, dy, dw, dh } = rect;
 
         // Prepare an offscreen canvas matching the drawn mask size
         const temp = document.createElement('canvas');
-        temp.width = Math.max(1, Math.round(dw));
-        temp.height = Math.max(1, Math.round(dh));
+        temp.width = safeInt(dw, imageArea.w);
+        temp.height = safeInt(dh, imageArea.h);
         const tctx = temp.getContext('2d');
 
-        // Draw the mask scaled to cover just like the base image
-        tctx.drawImage(maskImg, 0, 0, temp.width, temp.height);
-        // Keep only mask area with the fill color
-        tctx.globalCompositeOperation = 'source-in';
+        // Build tinted mask with shading preserved
+        // 1) Paint the flat colour
+        tctx.globalCompositeOperation = 'source-over';
         tctx.fillStyle = color;
         tctx.fillRect(0, 0, temp.width, temp.height);
+        // 2) Multiply mask luminance to keep shadows/highlights from the mask
+        tctx.globalCompositeOperation = 'multiply';
+        tctx.drawImage(readyMask, 0, 0, temp.width, temp.height);
+        // 3) Keep only the mask's alpha region
+        tctx.globalCompositeOperation = 'destination-in';
+        tctx.drawImage(readyMask, 0, 0, temp.width, temp.height);
 
-        // Multiply onto main canvas for a more natural blend, clipped to rounded rect
+        // Draw onto main canvas; multiply already baked into offscreen
         ctx.save();
         const r = 18;
         clipRoundedRect(ctx, imageArea, r);
-        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(temp, dx, dy);
         ctx.restore();
       }
