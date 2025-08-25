@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import ShareService from '../../../services/shareService';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+// Basic E.164-style validation after stripping common separators
+const isValidPhoneNumber = (raw) => {
+  if (!raw || typeof raw !== 'string') return false;
+  const trimmed = raw.trim();
+  // Allow digits, spaces, dashes, parentheses and leading +
+  const cleaned = trimmed.replace(/[\s\-()]/g, '');
+  const hasPlus = cleaned.startsWith('+');
+  const digits = hasPlus ? cleaned.slice(1) : cleaned;
+  if (!/^\d{10,15}$/.test(digits)) return false;
+  // basic guard against starting with 0 in national part
+  if (digits[0] === '0') return false;
+  return true;
+};
 
 const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
   const [name, setName] = useState('');
@@ -12,6 +25,7 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,6 +46,7 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
     if (!email.trim()) next.email = 'Email is required';
     else if (!emailRegex.test(email.trim())) next.email = 'Invalid email';
     if (!mobile.trim()) next.mobile = 'Contact number is required';
+    else if (!isValidPhoneNumber(mobile)) next.mobile = 'Enter a valid phone number';
     if (!agree) next.agree = 'Please accept Terms & Conditions';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -51,10 +66,20 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
         contactNumber: mobile.trim(),
         file,
       });
-      setSuccessMsg(res?.message || 'Successfully Shared Model');
+      const friendly = `Thanks ${name.trim()}! We'll share your visual to ${email.trim()}. Please check your inbox shortly. If you don't see it, check your spam folder.`;
+      const msg =  friendly;
+      setSuccessMsg(msg);
+      if (typeof window !== 'undefined' && window?.alert) {
+        window.alert(msg);
+      }
       if (onConfirm) onConfirm({ name, email, mobile });
     } catch (err) {
-      setServerError(err?.message || 'Failed to share');
+      const details = err?.message ? ` (${err.message})` : '';
+      const failMsg = `We couldn't share your visual right now. Please verify your details and try again.${details}`;
+      setServerError(failMsg);
+      if (typeof window !== 'undefined' && window?.alert) {
+        window.alert(failMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -120,7 +145,12 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
 
             <div className="flex items-start gap-2">
               <input id="agree" type="checkbox" checked={agree} onChange={(e)=>setAgree(e.target.checked)} disabled={loading} />
-              <label htmlFor="agree" className="text-sm">I agree to the <a href="/terms" className="underline">Terms & Conditions</a></label>
+              <label htmlFor="agree" className="text-sm">
+                I agree to the{' '}
+                <button type="button" className="underline" onClick={() => setIsTermsOpen(true)}>
+                  Terms & Conditions
+                </button>
+              </label>
             </div>
             {errors.agree && <div className="text-red-600 text-sm">{errors.agree}</div>}
 
@@ -148,6 +178,27 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
           </form>
         )}
       </div>
+      {isTermsOpen && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60">
+          <div className="bg-white text-black rounded-2xl shadow-xl w-[92%] max-w-[640px] max-h-[80vh] p-6 overflow-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Terms & Conditions</h3>
+              <button type="button" className="text-gray-500 hover:text-gray-700" onClick={() => setIsTermsOpen(false)}>✕</button>
+            </div>
+            <div className="space-y-4 text-sm leading-6">
+              <ul className="list-disc pl-5 space-y-2">
+                <li>You confirm that the contact details provided are accurate and belong to you.</li>
+                <li>Generated images may differ from real world colours due to lighting, display and processing.</li>
+                <li>We may contact you using the details provided to share your image and related information.</li>
+                <li>By proceeding you consent to the processing of your data in accordance with our privacy practices.</li>
+              </ul>
+            </div>
+            <div className="mt-5 text-right">
+              <button type="button" className="px-4 py-2 rounded-xl bg-black text-white" onClick={() => setIsTermsOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

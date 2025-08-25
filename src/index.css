@@ -88,6 +88,17 @@ html, body, a, button, input, select, textarea, [role="button"] {
   }
 }
 
+/* Force palette container width on very large screens (>= 1920px) */
+@media only screen and (min-width: 1920px) {
+  .palette-container {
+    width: 65% !important;
+  }
+  .vibrant-text {
+    font-size: 32px !important;
+    line-height: 1.1 !important;
+  }
+}
+
 @layer components {
   .title-text { @apply font-brand; }
   .vibrant-text { @apply font-brand; }
