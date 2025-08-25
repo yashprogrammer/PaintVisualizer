@@ -66,12 +66,20 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
         contactNumber: mobile.trim(),
         file,
       });
-      const friendly = `Thanks ${name.trim()}! We\'ll share your visual to ${email.trim()}${mobile?.trim() ? ` and WhatsApp ${mobile.trim()}` : ''}. Please check your inbox${mobile?.trim() ? ' and WhatsApp' : ''} shortly. If you don't see it, check your spam folder.`;
-      setSuccessMsg(res?.message || friendly);
+      const friendly = `Thanks ${name.trim()}! We'll share your visual to ${email.trim()}. Please check your inbox shortly. If you don't see it, check your spam folder.`;
+      const msg =  friendly;
+      setSuccessMsg(msg);
+      if (typeof window !== 'undefined' && window?.alert) {
+        window.alert(msg);
+      }
       if (onConfirm) onConfirm({ name, email, mobile });
     } catch (err) {
       const details = err?.message ? ` (${err.message})` : '';
-      setServerError(`We couldn't share your visual right now. Please verify your details and try again.${details}`);
+      const failMsg = `We couldn't share your visual right now. Please verify your details and try again.${details}`;
+      setServerError(failMsg);
+      if (typeof window !== 'undefined' && window?.alert) {
+        window.alert(failMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -89,8 +97,9 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
 
         {successMsg ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3">{successMsg}</div>
-            <p className="text-sm text-gray-700">Tip: You can now close this window and continue exploring other colour combinations.</p>
+            <div className="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3">
+              {successMsg}
+            </div>
             <div className="flex justify-end">
               <button type="button" className="px-4 py-2 rounded-xl bg-black text-white" onClick={onClose}>Close</button>
             </div>
