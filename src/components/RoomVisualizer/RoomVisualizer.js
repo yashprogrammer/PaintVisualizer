@@ -482,8 +482,8 @@ const RoomVisualizer = () => {
     setIsShareOpen(true);
   };
 
-  // Build a printable/exportable image of the current scene and trigger download
-  const generateAndDownloadImage = async () => {
+  // Build a share image blob for API upload
+  const buildShareImageBlob = async () => {
     try {
       const CANVAS_WIDTH = 1240; // approx A4 width at ~150dpi
       const CANVAS_HEIGHT = 1754; // A4-ish portrait
@@ -685,21 +685,15 @@ const RoomVisualizer = () => {
         ctx.restore();
       }
 
-      // Trigger download
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `room-share-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      return blob;
     } catch (err) {
       console.warn('Failed to generate image', err);
+      return null;
     }
   };
 
   const handleShareConfirm = async () => {
-    await generateAndDownloadImage();
     setIsShareOpen(false);
   };
 
@@ -855,6 +849,7 @@ const RoomVisualizer = () => {
           isOpen={isShareOpen}
           onClose={() => setIsShareOpen(false)}
           onConfirm={handleShareConfirm}
+          buildImageBlob={buildShareImageBlob}
         />
       </div>
     </div>
