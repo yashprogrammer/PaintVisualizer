@@ -17,7 +17,9 @@ const Visualizer = ({
   maskImagesRef,
   shouldBlinkSelection = false,
   onClearAreas,
-  onShare
+  onShare,
+  hideProtip = false,
+  onOpenTip
 }) => {
   // State for Protip visibility
   const [isProtipExpanded, setIsProtipExpanded] = React.useState(true);
@@ -49,8 +51,8 @@ const Visualizer = ({
     };
   }, []);
 
-  // Determine if Protip should be visible based on instruction
-  const showProtip = !shouldBlinkSelection; // Show on second instruction, hide on first
+  // Determine if Protip should be visible based on instruction and mobile toggle
+  const showProtip = !shouldBlinkSelection && !hideProtip; // Hide inline tip on mobile
 
   
   
@@ -163,6 +165,12 @@ const Visualizer = ({
             .share-btn svg {
               width: clamp(12px, 1.8vw, 14px) !important;
               height: clamp(12px, 1.8vw, 14px) !important;
+            }
+          }
+          /* Mobile: reduce instruction text size by 30% */
+          @media (max-width: 1024px) {
+            .instruction-text {
+              font-size: 0.7em !important;
             }
           }
         `}</style>
@@ -317,11 +325,26 @@ const Visualizer = ({
             </div>
           </div>
           <div className="surface-text font-light leading-none text-[#575454] text-[20px] lg:text-[28px] text-center font-brand w-full grid grid-cols-[auto_1fr_auto] items-center px-6 gap-3">
-            {/* Left placeholder to keep center exact irrespective of Share button */}
-            <div className="invisible">
+            {/* Left: Tip button (icon only, mobile only) */}
+            <div>
+              {hideProtip && (
+                <button
+                  type="button"
+                  onClick={onOpenTip}
+                  className="bg-white text-black rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50 share-btn"
+                  title="Show tip"
+                  aria-label="Show tip"
+                >
+                  <img src="/bulb-creative-idea-svgrepo-com.svg" alt="" className="w-[16px] h-[16px]" />
+                </button>
+              )}
+            </div>
+            <p className="instruction-text block leading-normal justify-self-center text-center w-full">{shouldBlinkSelection ? 'Select the wall you want to paint.' : 'Explore the colour lockups to find the perfect match.'}</p>
+            <div className="justify-self-end flex items-center gap-2">
               <button
                 type="button"
-                className="bg-white text-black rounded-xl border border-[#bab1b1] flex items-center gap-2 share-btn"
+                onClick={onShare}
+                className="bg-white text-black rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50 share-btn"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 33" fill="none" aria-hidden="true">
                   <path d="M24 11.166C26.2091 11.166 28 9.37515 28 7.16602C28 4.95688 26.2091 3.16602 24 3.16602C21.7909 3.16602 20 4.95688 20 7.16602C20 9.37515 21.7909 11.166 24 11.166Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -333,21 +356,6 @@ const Visualizer = ({
                 Share
               </button>
             </div>
-            <p className="block leading-normal justify-self-center text-center w-full">{shouldBlinkSelection ? 'Select the wall you want to paint.' : 'Explore the colour lockups to find the perfect match.'}</p>
-            <button
-              type="button"
-              onClick={onShare}
-              className="bg-white text-black rounded-xl border border-[#bab1b1] flex items-center gap-2 hover:bg-gray-50 share-btn justify-self-end"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 33" fill="none" aria-hidden="true">
-                <path d="M24 11.166C26.2091 11.166 28 9.37515 28 7.16602C28 4.95688 26.2091 3.16602 24 3.16602C21.7909 3.16602 20 4.95688 20 7.16602C20 9.37515 21.7909 11.166 24 11.166Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M8 20.5C10.2091 20.5 12 18.7091 12 16.5C12 14.2909 10.2091 12.5 8 12.5C5.79086 12.5 4 14.2909 4 16.5C4 18.7091 5.79086 20.5 8 20.5Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M24 29.834C26.2091 29.834 28 28.0431 28 25.834C28 23.6248 26.2091 21.834 24 21.834C21.7909 21.834 20 23.6248 20 25.834C20 28.0431 21.7909 29.834 24 29.834Z" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M11.4531 18.5137L20.5598 23.8203" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20.5465 9.17969L11.4531 14.4864" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Share
-            </button>
           </div>
           {/* Pro tip row below instruction and share - only show on second instruction */}
           {showProtip && (

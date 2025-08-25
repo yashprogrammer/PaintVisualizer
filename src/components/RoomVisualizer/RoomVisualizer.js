@@ -50,6 +50,8 @@ const RoomVisualizer = () => {
   const maskImagesRef = useRef({});
   const [isMasksLoaded, setIsMasksLoaded] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTipOpen, setIsTipOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Persist selected city for restoring selection on browser back
   useEffect(() => {
@@ -60,6 +62,23 @@ const RoomVisualizer = () => {
       }
     } catch (_) {}
   }, [city]);
+
+  // Track mobile viewport to control Pro tip visibility
+  useEffect(() => {
+    const updateIsMobile = () => {
+      try {
+        const w = window.innerWidth;
+        setIsMobile(w <= 1024);
+      } catch (_) {}
+    };
+    updateIsMobile();
+    window.addEventListener('resize', updateIsMobile);
+    window.addEventListener('orientationchange', updateIsMobile);
+    return () => {
+      window.removeEventListener('resize', updateIsMobile);
+      window.removeEventListener('orientationchange', updateIsMobile);
+    };
+  }, []);
 
   // Function to extract colors from SVG content
   const extractColorsFromSVG = (svgContent) => {
@@ -914,6 +933,8 @@ const RoomVisualizer = () => {
           onClearAreas={clearCurrentRoomSurfaces}
           onShare={handleShare}
           shouldBlinkSelection={!hasSelectedSurfaceOnce}
+          hideProtip={isMobile}
+          onOpenTip={() => setIsTipOpen(true)}
         />
         <RoomOptions
           currentRoom={currentRoom}
@@ -925,6 +946,25 @@ const RoomVisualizer = () => {
           onConfirm={handleShareConfirm}
           buildImageBlob={buildShareImageBlob}
         />
+        {isTipOpen && (
+          <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/40">
+            <div className="bg-white text-black rounded-2xl shadow-xl w-[88%] max-w-[420px] p-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <img src="/bulb-creative-idea-svgrepo-com.svg" alt="" className="w-5 h-5" />
+                  <h3 className="text-lg font-semibold font-brand m-0">Tip</h3>
+                </div>
+                <button type="button" onClick={() => setIsTipOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <p className="text-sm text-[#575454] font-brand leading-snug">
+                For a soft and subtle look, stick with shades A–D. For a bold and vibrant look, start with E or F, then mix in shades from A to D to balance it out.
+              </p>
+              <div className="mt-4 text-right">
+                <button type="button" onClick={() => setIsTipOpen(false)} className="px-4 py-2 rounded-xl bg-black text-white">Got it</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
