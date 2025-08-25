@@ -531,33 +531,41 @@ const RoomVisualizer = () => {
 
       // Margins and layout
       const marginX = 64;
-      const topAreaHeight = 120;
+      const headerHeight = 264; // +20% to accommodate larger COW image
       const gap = 24;
 
-      // 1) Draw Dulux logo on top, centered
+      // 1) Header image only (no drawn text)
       await new Promise((resolve) => {
-        const logo = new Image();
-        logo.crossOrigin = 'anonymous';
-        logo.onload = () => {
-          const maxLogoW = CANVAS_WIDTH * 0.5;
-          const scale = Math.min(maxLogoW / logo.width, (topAreaHeight - 20) / logo.height);
-          const w = logo.width * scale;
-          const h = logo.height * scale;
+        const heart = new Image();
+        heart.crossOrigin = 'anonymous';
+        heart.onload = () => {
+          const maxW = 360; // +20% scale for COW image
+          const maxH = 204; // +20% scale for COW image
+          const scale = Math.min(maxW / heart.width, maxH / heart.height);
+          const w = heart.width * scale;
+          const h = heart.height * scale;
           const x = (CANVAS_WIDTH - w) / 2;
-          const y = 20 + (topAreaHeight - 20 - h) / 2;
-          ctx.drawImage(logo, x, y, w, h);
+          const y = 20 + (headerHeight - 20 - h) / 2;
+          ctx.drawImage(heart, x, y, w, h);
           resolve();
         };
-        logo.onerror = () => resolve();
-        logo.src = '/Dulux.png';
+        heart.onerror = () => resolve();
+        // Prefer full asset, fallback to optimized
+        heart.src = '/COW_Red_heart_Explore.png';
+        // Fallback if not available
+        setTimeout(() => {
+          if (!heart.complete) {
+            heart.src = '/optimized/COW_Red_heart_Explore-med.png';
+          }
+        }, 50);
       });
 
       // 2) Compose the room image (base + colored masks)
       const imageArea = {
         x: marginX,
-        y: topAreaHeight + gap,
+        y: headerHeight + gap,
         w: CANVAS_WIDTH - marginX * 2,
-        h: 860,
+        h: 780,
       };
 
       // Draw base image, fit within imageArea keeping aspect ratio (cover)
@@ -611,13 +619,17 @@ const RoomVisualizer = () => {
         ctx.restore();
       }
 
-      // 3) Draw selected colors grid (2x2)
+      // 3) Draw selected colors in a single-row grid (centered, up to 4 columns)
       const swatches = (colorPalettes[currentPalette]?.paintColors || []).slice(0, 4);
-      const swatchAreaTop = imageArea.y + imageArea.h + gap * 1.5;
+      const usedCount = swatches.length;
+      const swatchAreaTop = imageArea.y + imageArea.h + gap * 1.2;
       const gridW = CANVAS_WIDTH - marginX * 2;
-      const gridH = CANVAS_HEIGHT - swatchAreaTop - 64;
-      const cellW = (gridW - gap) / 2;
-      const cellH = (gridH - gap) / 2;
+      const gridH = 260; // taller cards for increased scale
+      const cols = Math.max(0, usedCount);
+      const cellW = Math.floor(Math.min(260, (gridW - 3 * gap) / 4));
+      const cellH = gridH;
+      const groupW = cols > 0 ? cols * cellW + (cols - 1) * gap : 0;
+      const startX = marginX + Math.max(0, Math.floor((gridW - groupW) / 2));
 
       const isColorUsedInRoom = (hex) => {
         const used = surfaceColors[currentRoom] || {};
@@ -633,11 +645,10 @@ const RoomVisualizer = () => {
         return { r: parseInt(n.slice(0, 2), 16), g: parseInt(n.slice(2, 4), 16), b: parseInt(n.slice(4, 6), 16) };
       };
 
-      for (let i = 0; i < 4; i++) {
-        const row = Math.floor(i / 2);
-        const col = i % 2;
-        const x = marginX + col * (cellW + gap);
-        const y = swatchAreaTop + row * (cellH + gap);
+      for (let i = 0; i < cols; i++) {
+        const col = i;
+        const x = startX + col * (cellW + gap);
+        const y = swatchAreaTop;
         const color = swatches[i];
 
         // Card background
@@ -661,10 +672,10 @@ const RoomVisualizer = () => {
           const brightness = (r * 299 + g * 587 + b * 114) / 1000;
           const text = brightness <= 140 ? '#FFFFFF' : '#000000';
           ctx.fillStyle = text;
-          ctx.font = 'bold 24px Inter, Arial, sans-serif';
-          ctx.fillText(info.name || '', x + 20, y + 40);
-          ctx.font = '16px Inter, Arial, sans-serif';
-          if (info.detail) ctx.fillText(info.detail, x + 20, y + 70);
+          ctx.font = 'bold 28px Inter, Arial, sans-serif';
+          ctx.fillText(info.name || '', x + 20, y + 44);
+          ctx.font = '18px Inter, Arial, sans-serif';
+          if (info.detail) ctx.fillText(info.detail, x + 20, y + 76);
 
           if (isColorUsedInRoom(color)) {
             // Tag: Featured in scene
@@ -684,6 +695,69 @@ const RoomVisualizer = () => {
 
         ctx.restore();
       }
+
+      // 4) Disclaimer text and Dulux logo at bottom-right
+      const disclaimerTop = swatchAreaTop + gridH + gap * 1.2;
+      const disclaimerText = 'COLORS SHOWN ON YOUR SCREEN MAY VARY FROM THE ACTUAL PAINT SHADES DUE TO SCREEN SETTINGS AND DISPLAY DIFFERENCES. FOR THE MOST ACCURATE REPRESENTATION, PLEASE VISIT YOUR NEAREST STORE TO VIEW PHYSICAL COLOR SAMPLES.';
+
+      // Word-wrap helper
+      const drawWrapped = (context, text, x, y, maxWidth, lineHeight) => {
+        const words = text.split(/\s+/);
+        let line = '';
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line ? line + ' ' + words[n] : words[n];
+          const metrics = context.measureText(testLine);
+          const testWidth = metrics.width;
+          if (testWidth > maxWidth && n > 0) {
+            context.fillText(line, x, y);
+            line = words[n];
+            y += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) context.fillText(line, x, y);
+      };
+
+      // Dulux logo bottom-right and wrap disclaimer to fill width up to logo
+      await new Promise((resolve) => {
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.onload = () => {
+          const maxW = 216; // +20% scale for Dulux logo
+          const maxH = 144; // +20% scale for Dulux logo
+          const scale = Math.min(maxW / logo.width, maxH / logo.height);
+          const w = logo.width * scale;
+          const h = logo.height * scale;
+          const logoX = CANVAS_WIDTH - marginX - w;
+          const logoY = CANVAS_HEIGHT - marginX - h; // bottom-right of the page
+
+          // Draw disclaimer using remaining width, aligned with top edge of the logo
+          ctx.save();
+          ctx.fillStyle = '#111827';
+          ctx.font = '14px Inter, Arial, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          const maxTextWidth = logoX - marginX - 16; // extend to the left edge of logo
+          drawWrapped(ctx, disclaimerText, marginX, logoY, maxTextWidth, 20);
+          ctx.restore();
+
+          // Draw logo
+          ctx.drawImage(logo, logoX, logoY, w, h);
+          resolve();
+        };
+        logo.onerror = () => {
+          // If logo fails, draw full-width disclaimer
+          ctx.save();
+          ctx.fillStyle = '#111827';
+          ctx.font = '14px Inter, Arial, sans-serif';
+          ctx.textAlign = 'left';
+          drawWrapped(ctx, disclaimerText, marginX, disclaimerTop + 18, CANVAS_WIDTH - marginX * 2, 20);
+          ctx.restore();
+          resolve();
+        };
+        logo.src = '/Dulux.png';
+      });
 
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
       return blob;
