@@ -29,8 +29,8 @@
         bottom: 0;
         display: none;
         z-index: 2147483647;
-        background: #0b0b0f;
-        color: #ffffff;
+        background: #ffffff;
+        color: #000000;
         text-align: center;
         padding: 24px;
       }
@@ -53,10 +53,10 @@
         margin: 0;
       }
       #orientation-overlay .icon {
-        width: 72px;
-        height: 72px;
+        width: 96px;
+        height: auto;
         margin-bottom: 16px;
-        opacity: 0.9;
+        opacity: 1;
       }
       @media (orientation: portrait) {
         #orientation-overlay { display: block; }
@@ -71,10 +71,7 @@
     <div id="root"></div>
     <div id="orientation-overlay" aria-hidden="true">
       <div class="inner">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-          <path d="M7 7h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M12 3v3M4.6 5.5l2.1 2.1M19.4 5.5l-2.1 2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+        <img id="overlay-image" class="icon" src="" alt="" />
         <h1 id="overlay-title">Please rotate your device</h1>
         <p id="overlay-description">This experience is optimized for landscape orientation. Rotate to landscape to continue.</p>
       </div>
@@ -95,13 +92,22 @@
         function updateOverlayText() {
           const titleElement = document.getElementById('overlay-title');
           const descriptionElement = document.getElementById('overlay-description');
+          const imageElement = document.getElementById('overlay-image');
           
           if (isDesktop()) {
             titleElement.textContent = 'Please resize your window';
             descriptionElement.textContent = 'This experience is optimized for landscape orientation. Please resize your window to landscape orientation.';
+            if (imageElement) {
+              imageElement.src = '%PUBLIC_URL%/resizeWindow.png';
+              imageElement.alt = 'Resize your window';
+            }
           } else {
             titleElement.textContent = 'Please rotate your device';
             descriptionElement.textContent = 'This experience is optimized for landscape orientation. Rotate to landscape to continue.';
+            if (imageElement) {
+              imageElement.src = '%PUBLIC_URL%/rotate-smartphone.png';
+              imageElement.alt = 'Rotate your device';
+            }
           }
         }
 
