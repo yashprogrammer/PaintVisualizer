@@ -7,7 +7,7 @@
 
 const API_BASE_URL = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_BASE_URL)
   ? process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '')
-  : 'http://localhost:15205/api/v1';
+  : 'https://duluxcoloursoftheworld.com/api/v1';
 
 export async function shareModel({ name, email, contactNumber, file }) {
   const form = new FormData();
