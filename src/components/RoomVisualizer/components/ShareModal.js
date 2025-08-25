@@ -186,14 +186,12 @@ const ShareModal = ({ isOpen, onClose, onConfirm, buildImageBlob }) => {
               <button type="button" className="text-gray-500 hover:text-gray-700" onClick={() => setIsTermsOpen(false)}>✕</button>
             </div>
             <div className="space-y-4 text-sm leading-6">
-              <p>These sample Terms & Conditions govern your use of the Colours of the World visualizer share feature.</p>
               <ul className="list-disc pl-5 space-y-2">
                 <li>You confirm that the contact details provided are accurate and belong to you.</li>
                 <li>Generated images may differ from real world colours due to lighting, display and processing.</li>
                 <li>We may contact you using the details provided to share your image and related information.</li>
                 <li>By proceeding you consent to the processing of your data in accordance with our privacy practices.</li>
               </ul>
-              <p>This is placeholder content. Replace with your official Terms & Conditions.</p>
             </div>
             <div className="mt-5 text-right">
               <button type="button" className="px-4 py-2 rounded-xl bg-black text-white" onClick={() => setIsTermsOpen(false)}>Close</button>
