@@ -277,8 +277,8 @@ const Visualizer = ({
                 );
               }
 
-              // Pre-selection blink outline on top (applies to all surfaces)
-              if (shouldBlinkSelection) {
+              // Pre-selection blink outline on top (applies only to surfaces without color)
+              if (shouldBlinkSelection && !surfaceColor) {
                 overlays.push(
                   <img
                     key={`blink-${surface.id}`}
