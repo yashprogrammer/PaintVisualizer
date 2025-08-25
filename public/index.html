@@ -75,9 +75,46 @@
           <path d="M7 7h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/>
           <path d="M12 3v3M4.6 5.5l2.1 2.1M19.4 5.5l-2.1 2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <h1>Please rotate your device</h1>
-        <p>This experience is optimized for landscape orientation. Rotate to landscape to continue.</p>
+        <h1 id="overlay-title">Please rotate your device</h1>
+        <p id="overlay-description">This experience is optimized for landscape orientation. Rotate to landscape to continue.</p>
       </div>
     </div>
+    <script>
+      // Device detection and orientation overlay text updates
+      (function() {
+        function isDesktop() {
+          // Check for desktop by looking at screen size and touch capability
+          const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+          const isLargeScreen = window.screen.width >= 1024 || window.screen.height >= 1024;
+          
+          // Desktop if large screen and no touch, or if user agent indicates desktop
+          return (isLargeScreen && !hasTouch) || 
+                 (/Windows|Macintosh|Linux/.test(navigator.userAgent) && !/Mobile|Android|iPhone|iPad/.test(navigator.userAgent));
+        }
+
+        function updateOverlayText() {
+          const titleElement = document.getElementById('overlay-title');
+          const descriptionElement = document.getElementById('overlay-description');
+          
+          if (isDesktop()) {
+            titleElement.textContent = 'Please resize your window';
+            descriptionElement.textContent = 'This experience is optimized for landscape orientation. Please resize your window to landscape orientation.';
+          } else {
+            titleElement.textContent = 'Please rotate your device';
+            descriptionElement.textContent = 'This experience is optimized for landscape orientation. Rotate to landscape to continue.';
+          }
+        }
+
+        // Update text when page loads
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', updateOverlayText);
+        } else {
+          updateOverlayText();
+        }
+
+        // Update text on window resize (in case desktop detection changes)
+        window.addEventListener('resize', updateOverlayText);
+      })();
+    </script>
   </body>
-</html> 
+</html>
