@@ -51,6 +51,16 @@ const RoomVisualizer = () => {
   const [isMasksLoaded, setIsMasksLoaded] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
+  // Persist selected city for restoring selection on browser back
+  useEffect(() => {
+    try {
+      const sanitizedCity = city?.toLowerCase().replace(/'/g,'').trim();
+      if (sanitizedCity && typeof window !== 'undefined') {
+        sessionStorage.setItem('selectedCity', sanitizedCity);
+      }
+    } catch (_) {}
+  }, [city]);
+
   // Function to extract colors from SVG content
   const extractColorsFromSVG = (svgContent) => {
     const fillRegex = /fill="([^"]+)"/g;
@@ -472,8 +482,8 @@ const RoomVisualizer = () => {
     setIsShareOpen(true);
   };
 
-  // Build a printable/exportable image of the current scene and trigger download
-  const generateAndDownloadImage = async () => {
+  // Build a share image blob for API upload
+  const buildShareImageBlob = async () => {
     try {
       const CANVAS_WIDTH = 1240; // approx A4 width at ~150dpi
       const CANVAS_HEIGHT = 1754; // A4-ish portrait
@@ -481,6 +491,39 @@ const RoomVisualizer = () => {
       canvas.width = CANVAS_WIDTH;
       canvas.height = CANVAS_HEIGHT;
       const ctx = canvas.getContext('2d');
+
+      // Helpers to match on-screen rendering
+      const getCoverRect = (imgW, imgH, box) => {
+        const arImg = imgW / imgH;
+        const arBox = box.w / box.h;
+        let dw = box.w;
+        let dh = box.h;
+        let dx = box.x;
+        let dy = box.y;
+        if (arImg > arBox) {
+          // Image is wider: fit height, crop width (center)
+          dh = box.h;
+          dw = dh * arImg;
+          dx = box.x - (dw - box.w) / 2;
+        } else {
+          // Image is taller: fit width, crop height (center)
+          dw = box.w;
+          dh = dw / arImg;
+          dy = box.y - (dh - box.h) / 2;
+        }
+        return { dx, dy, dw, dh };
+      };
+
+      const clipRoundedRect = (context, box, radius) => {
+        context.beginPath();
+        context.moveTo(box.x + radius, box.y);
+        context.arcTo(box.x + box.w, box.y, box.x + box.w, box.y + box.h, radius);
+        context.arcTo(box.x + box.w, box.y + box.h, box.x, box.y + box.h, radius);
+        context.arcTo(box.x, box.y + box.h, box.x, box.y, radius);
+        context.arcTo(box.x, box.y, box.x + box.w, box.y, radius);
+        context.closePath();
+        context.clip();
+      };
 
       // Background
       ctx.fillStyle = '#ffffff';
@@ -522,36 +565,11 @@ const RoomVisualizer = () => {
         const baseImg = new Image();
         baseImg.crossOrigin = 'anonymous';
         baseImg.onload = () => {
-          const iw = baseImg.width;
-          const ih = baseImg.height;
-          const arImg = iw / ih;
-          const arBox = imageArea.w / imageArea.h;
-          let dw = imageArea.w;
-          let dh = imageArea.h;
-          let dx = imageArea.x;
-          let dy = imageArea.y;
-          if (arImg > arBox) {
-            // image is wider; fit height, crop width
-            dh = imageArea.h;
-            dw = dh * arImg;
-            dx = imageArea.x - (dw - imageArea.w) / 2;
-          } else {
-            // image taller; fit width, crop height
-            dw = imageArea.w;
-            dh = dw / arImg;
-            dy = imageArea.y - (dh - imageArea.h) / 2;
-          }
           ctx.save();
-          ctx.beginPath();
           // Rounded corners like UI
           const r = 18;
-          ctx.moveTo(imageArea.x + r, imageArea.y);
-          ctx.arcTo(imageArea.x + imageArea.w, imageArea.y, imageArea.x + imageArea.w, imageArea.y + imageArea.h, r);
-          ctx.arcTo(imageArea.x + imageArea.w, imageArea.y + imageArea.h, imageArea.x, imageArea.y + imageArea.h, r);
-          ctx.arcTo(imageArea.x, imageArea.y + imageArea.h, imageArea.x, imageArea.y, r);
-          ctx.arcTo(imageArea.x, imageArea.y, imageArea.x + imageArea.w, imageArea.y, r);
-          ctx.closePath();
-          ctx.clip();
+          clipRoundedRect(ctx, imageArea, r);
+          const { dx, dy, dw, dh } = getCoverRect(baseImg.width, baseImg.height, imageArea);
           ctx.drawImage(baseImg, dx, dy, dw, dh);
           ctx.restore();
           resolve();
@@ -568,24 +586,28 @@ const RoomVisualizer = () => {
         const maskImg = maskImagesRef.current[surface.id];
         if (!color || !maskImg) continue;
 
-        // Prepare an offscreen canvas to tint by mask alpha
+        // Compute the same cover + center-crop rectangle for the mask
+        const { dx, dy, dw, dh } = getCoverRect(maskImg.width, maskImg.height, imageArea);
+
+        // Prepare an offscreen canvas matching the drawn mask size
         const temp = document.createElement('canvas');
-        temp.width = imageArea.w;
-        temp.height = imageArea.h;
+        temp.width = Math.max(1, Math.round(dw));
+        temp.height = Math.max(1, Math.round(dh));
         const tctx = temp.getContext('2d');
 
-        // Draw mask to temp scaled to imageArea
-        // We assume mask aligns with base image when stretched to the same box
+        // Draw the mask scaled to cover just like the base image
         tctx.drawImage(maskImg, 0, 0, temp.width, temp.height);
         // Keep only mask area with the fill color
         tctx.globalCompositeOperation = 'source-in';
         tctx.fillStyle = color;
         tctx.fillRect(0, 0, temp.width, temp.height);
 
-        // Multiply onto main canvas for a more natural blend
+        // Multiply onto main canvas for a more natural blend, clipped to rounded rect
         ctx.save();
+        const r = 18;
+        clipRoundedRect(ctx, imageArea, r);
         ctx.globalCompositeOperation = 'multiply';
-        ctx.drawImage(temp, imageArea.x, imageArea.y);
+        ctx.drawImage(temp, dx, dy);
         ctx.restore();
       }
 
@@ -663,21 +685,15 @@ const RoomVisualizer = () => {
         ctx.restore();
       }
 
-      // Trigger download
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `room-share-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      return blob;
     } catch (err) {
       console.warn('Failed to generate image', err);
+      return null;
     }
   };
 
   const handleShareConfirm = async () => {
-    await generateAndDownloadImage();
     setIsShareOpen(false);
   };
 
@@ -833,6 +849,7 @@ const RoomVisualizer = () => {
           isOpen={isShareOpen}
           onClose={() => setIsShareOpen(false)}
           onConfirm={handleShareConfirm}
+          buildImageBlob={buildShareImageBlob}
         />
       </div>
     </div>

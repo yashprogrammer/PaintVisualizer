@@ -30,10 +30,23 @@ const CitySelector = () => {
     return index !== -1 ? index : 1; // Return found index or default to Egypt
   };
 
-  // Determine initial selected city from navigation state or default to Egypt
+  const getStoredCity = () => {
+    try {
+      if (typeof window === 'undefined') return null;
+      const value = sessionStorage.getItem('selectedCity');
+      return value || null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // Determine initial selected city from navigation state, then storage, else default to Egypt
   const initialCityIndex = location.state?.selectedCity 
     ? findCityIndex(location.state.selectedCity) 
-    : 1;
+    : (() => {
+        const stored = getStoredCity();
+        return stored ? findCityIndex(stored) : 1;
+      })();
 
   const [selectedIndex, setSelectedIndex] = useState(initialCityIndex);
   const [displayedCityIndex, setDisplayedCityIndex] = useState(initialCityIndex); // controls the city name shown in text
@@ -297,7 +310,7 @@ const CitySelector = () => {
   // Logo sizing responsive to both width and height
   const logoWidthPx = clampNumber(64, Math.min(viewportWidth * 0.11, viewportHeight * 0.14), 220);
   const logoTopPx = clampNumber(8, viewportHeight * 0.02, 32);
-  const logoRightPx = clampNumber(8, viewportWidth * 0.02, 40);
+  const logoLeftPx = clampNumber(8, viewportWidth * 0.02, 40);
 
   // Always use low-quality variant for heart video (fallback to original if missing)
   const getPrioritizedVideoSources = (city) => {
@@ -308,16 +321,33 @@ const CitySelector = () => {
   // Responsive carousel sizing
   const itemWidth = clampNumber(120, viewportWidth / 4, 520);
   const itemHeight = Math.round(clampNumber(90, viewportHeight * 0.16, 240));
+  // Number of edge clones required to ensure no blank space at the ends
+  const clonesCount = Math.max(2, Math.ceil(viewportWidth / itemWidth) + 1);
   const carouselRef = useRef(null);
   const videoRef = useRef(null);
   
-  // Build an extended list with clones for infinite scroll illusion
-  const extendedCities = [cities[cities.length - 1], ...cities, cities[0]];
+  // Build an extended list with sufficient edge clones for an infinite scroll illusion
+  const extendedCities = [
+    ...cities.slice(-clonesCount),
+    ...cities,
+    ...cities.slice(0, clonesCount),
+  ];
 
   // Initialize position to center on the selected city
   useEffect(() => {
-    setVirtualIndex(initialCityIndex + 1); // start on the selected city (accounting for cloned edge)
-  }, [initialCityIndex]);
+    setVirtualIndex(initialCityIndex + clonesCount); // account for cloned edges
+  }, [initialCityIndex, clonesCount]);
+
+  // Keep session storage in sync with current selected city
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const name = cities[selectedIndex]?.name || '';
+        const sanitized = name.toLowerCase().replace(/'/g, '');
+        if (sanitized) sessionStorage.setItem('selectedCity', sanitized);
+      }
+    } catch (_) {}
+  }, [selectedIndex]);
 
   // Clear navigation state after using it to prevent persistence across navigations
   useEffect(() => {
@@ -568,7 +598,7 @@ const CitySelector = () => {
         decoding="async"
       />
 
-      <div className="absolute z-20" style={{ top: `${logoTopPx}px`, right: `${logoRightPx}px` }}>
+      <div className="absolute z-20" style={{ top: `${logoTopPx}px`, left: `${logoLeftPx}px` }}>
         <img src='/Dulux.png' alt="Colours of the World" style={{ width: `${logoWidthPx}px` }}/>
       </div>
 
@@ -766,18 +796,17 @@ const CitySelector = () => {
                 onPointerLeave={onPointerLeave}
                 onTransitionEnd={() => {
                   // Sync selectedIndex to the slide that stopped under the heart
-                  const realIndex = (virtualIndex - 1 + cities.length) % cities.length;
+                  const raw = virtualIndex - clonesCount;
+                  const realIndex = ((raw % cities.length) + cities.length) % cities.length;
                   setSelectedIndex(realIndex);
                   setDisplayedCityIndex(realIndex);
 
-                  // When we hit cloned slides, jump instantly to the corresponding real slide
-                  if (virtualIndex === extendedCities.length - 1) {
+                  // When we land inside the cloned ranges, jump instantly to the real index position
+                  const firstReal = clonesCount;
+                  const lastReal = clonesCount + cities.length - 1;
+                  if (virtualIndex < firstReal || virtualIndex > lastReal) {
                     setInstantJump(true);
-                    setVirtualIndex(1);
-                    requestAnimationFrame(() => setInstantJump(false));
-                  } else if (virtualIndex === 0) {
-                    setInstantJump(true);
-                    setVirtualIndex(extendedCities.length - 2);
+                    setVirtualIndex(firstReal + realIndex);
                     requestAnimationFrame(() => setInstantJump(false));
                   }
 
@@ -808,13 +837,14 @@ const CitySelector = () => {
                         height: '100%',
                         border: '1px solid transparent',
                         borderImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 30%, rgba(255,255,255,1) 70%, rgba(255,255,255,0) 100%) 1',
+                        boxSizing: 'border-box',
                         // Removed padding to eliminate gaps between images
                       }}
                     >
                       <ProgressiveImage
                         image={city.image}
                         alt={city.name}
-                        className={`w-full h-full px-[1px] object-cover transition-opacity duration-300 select-none ${
+                        className={`w-full h-full object-cover transition-opacity duration-300 select-none ${
                           isSelected
                             ? 'opacity-100 shadow-lg scale-100' 
                             : 'opacity-80 scale-100'
